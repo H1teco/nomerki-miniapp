@@ -241,7 +241,7 @@ async function getUser(env,a,now){
   return u;
 }
 const strip=p=>{const{id,paid,...r}=p;return r};
-const plateOf=r=>({...JSON.parse(r.data),id:r.id,st:r.st});
+const plateOf=r=>({...JSON.parse(r.data),id:r.id,st:r.st,t:r.created});
 const lotPlate=r=>({...JSON.parse(r.data),id:r.plate_id});
 const userOut=(u,env)=>({id:u.id,name:u.name,coins:u.coins,spins:u.spins,admin:isAdmin(env,u.id)});
 function dailyOf(u,now){
@@ -378,7 +378,7 @@ const routes={
     await housekeeping(env,now);
     const sq=url.searchParams.get('since'),since=sq===null?now:+sq||0;
     const[inv,lots,sales]=await Promise.all([
-      env.DB.prepare('SELECT id,st,data FROM plates WHERE owner=? ORDER BY rar DESC,v DESC LIMIT 1000').bind(u.id).all(),
+      env.DB.prepare('SELECT id,st,data,created FROM plates WHERE owner=? ORDER BY rar DESC,v DESC LIMIT 1000').bind(u.id).all(),
       env.DB.prepare("SELECT COUNT(*) n FROM lots WHERE seller=? AND st='active'").bind(u.id).first(),
       env.DB.prepare(`SELECT COUNT(*) n,COALESCE(SUM(price*${100-COMM}/100),0) net FROM lots WHERE seller=? AND st='sold' AND sold_at>?`).bind(u.id,since).first()
     ]);

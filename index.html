@@ -393,6 +393,32 @@ main{display:flex;flex-direction:column}
 #ov-err h2{margin:0}
 #ov-err p{margin:0;color:var(--mut);font-size:14px;line-height:1.5;max-width:300px}
 #ov-err .btn{margin-top:8px;min-width:180px;height:50px}
+/* гараж: панель, выбор, быстрая продажа */
+.gtb{display:flex;align-items:center;gap:8px;margin:12px 0 10px;flex-wrap:nowrap}
+.gtb button{height:38px;padding:0 12px;border-radius:19px;background:var(--card);border:1px solid var(--line);color:var(--tx);font:600 13px Onest,sans-serif;display:flex;align-items:center;gap:6px;flex:none}
+.gtb button svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.gtb .sp{flex:1}
+.gtb #g-sel.on{background:var(--ac);border-color:var(--ac);color:#0b0e14}
+#chips-garage{margin-top:2px}
+.row .ck{width:24px;height:24px;border-radius:8px;border:2px solid #3a4766;flex:none;display:flex;align-items:center;justify-content:center;transition:background .12s,border-color .12s}
+.row .ck svg{width:14px;height:14px;stroke:#0b0e14;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.row.sel{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+.row.sel .ck{background:var(--ac);border-color:var(--ac)}
+.row.sel .ck svg{opacity:1}
+.row.lk{opacity:.5}
+.row.lk .ck{visibility:hidden}
+#g-bar{position:sticky;bottom:0;margin:6px -4px 0;padding:12px;border-radius:22px;background:#121724;border:1px solid #2a3348;box-shadow:0 -14px 30px rgba(0,0,0,.45);display:none;flex-direction:column;gap:10px;z-index:5}
+#g-bar.on{display:flex}
+#g-bar .gi{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--mut)}
+#g-bar .gi b{color:var(--tx);font-weight:600}
+#g-bar .gi button{border:0;background:none;color:var(--ac);font:600 13px Onest,sans-serif;padding:4px 0}
+#g-bar .gr{display:flex;gap:8px}
+#g-bar .btn{flex:1;height:48px;padding:0 10px;font-size:14px}
+#g-bar .btn.go{flex:1.4;background:var(--ac);color:#0b0e14}
+#g-bar .btn:disabled{opacity:.35}
+#qs .qo{display:block;width:100%;margin-top:8px;text-align:left;height:auto;min-height:52px;padding:12px 16px;font-size:14px}
+#qs .qo:disabled{opacity:.35}
+#qs h3{margin:6px 0 0;font-size:19px}
 #ov-sub{z-index:90;background:#0b0e14;-webkit-backdrop-filter:none;backdrop-filter:none;flex-direction:column;text-align:center;gap:12px;padding:30px}
 #ov-sub h2{margin:0;font-size:24px}
 #ov-sub p{margin:0;color:var(--mut);font-size:14px;line-height:1.5;max-width:300px}
@@ -516,12 +542,23 @@ main{display:flex;flex-direction:column}
 
     <section class="tab" id="t-garage">
       <h2>Гараж</h2>
-      <p class="mut">Ваши номера. Нажмите на номер, чтобы продать.</p>
+      <p class="mut">Нажмите на номер, чтобы продать. «Выбрать» — для нескольких сразу.</p>
       <div class="stats">
         <div class="stat glass"><small>Номеров</small><b id="g-count">0</b></div>
         <div class="stat glass"><small>Стоимость</small><b><i class="coin"></i><span id="g-total">0</span></b></div>
       </div>
+      <div class="chips" id="chips-garage"></div>
+      <div class="gtb">
+        <button id="g-sort"><span id="g-sort-l"></span><svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5l3-3"/></svg></button>
+        <span class="sp"></span>
+        <button id="g-quick">Быстрая продажа</button>
+        <button id="g-sel">Выбрать</button>
+      </div>
       <div id="g-list"></div>
+      <div id="g-bar">
+        <div class="gi"><span id="gb-n"></span><button id="gb-all">Выбрать все</button></div>
+        <div class="gr"><button class="btn" id="gb-mk">На рынок −7%</button><button class="btn go" id="gb-sell">Продать</button></div>
+      </div>
     </section>
 
     <section class="tab" id="t-profile">
@@ -602,6 +639,7 @@ main{display:flex;flex-direction:column}
 <div class="ov full" id="ov-ad"><div class="page" id="ad"></div></div>
 <div class="ov full" id="ov-rw"><div class="page" id="rw"></div></div>
 <div class="ov sheet" id="ov-pm"><div class="sh" id="pm"></div></div>
+<div class="ov sheet" id="ov-qs"><div class="sh" id="qs"></div></div>
 <div class="ov sheet" id="ov-cn"><div class="sh" id="cn"></div></div>
 <div class="ov sheet" id="ov-pk"><div class="sh" id="pk" style="max-height:82vh;overflow-y:auto"></div></div>
 <div class="ov on" id="ov-err"><div class="spinner" id="err-sp"></div><h2 id="err-h">Загрузка…</h2><p id="err-p"></p><button class="btn gold" id="err-b" style="display:none">Повторить</button></div>
@@ -814,14 +852,16 @@ function plateHTML(p,size,shine){
 /* адрес сервера игры (Cloudflare Worker) */
 const API='https://numerki.standoffboost80.workers.dev';
 const KEY='numbers_v4';
-const PREF=['filter','mfilter','tier','count','msort','last','recent','seen'];
+const PREF=['filter','mfilter','tier','count','msort','last','recent','seen','gsort','gfilter'];
 let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 /* coins, inv, spins, daily, wheel приходят с сервера и нигде локально не хранятся */
-const S=Object.assign({coins:0,inv:[],spins:0,daily:null,wheel:null,reset:0,lotsN:0,recent:[],last:null,filter:'KZ',mfilter:'ALL',tier:0,count:1,msort:'val',seen:0},saved||{});
+const S=Object.assign({coins:0,inv:[],spins:0,daily:null,wheel:null,reset:0,lotsN:0,recent:[],last:null,filter:'KZ',mfilter:'ALL',tier:0,count:1,msort:'val',seen:0,gsort:'rar',gfilter:'ALL'},saved||{});
 if(!C[S.filter])S.filter='KZ';
 if(!TIERS[S.tier])S.tier=0;
 if(!(S.count>=1&&S.count<=5))S.count=1;
 if(!['val','rar','cheap'].includes(S.msort))S.msort='val';
+if(!['val','cheap','rar','new'].includes(S.gsort))S.gsort='rar';
+if(!['ALL','KZ','RU','UA','BY'].includes(S.gfilter))S.gfilter='ALL';
 const save=()=>{try{const o={};PREF.forEach(k=>o[k]=S[k]);localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}};
 const qs=p=>Math.floor(p.v*SELL);
 const COMM=5,MAX_LOTS=10;
@@ -1281,16 +1321,114 @@ function renderRecent(){
 }
 
 /* ---------- гараж ---------- */
-function rowHTML(p,extra,foot){
-  return `<div class="row glass r${p.rar}" data-id="${p.id}"><div class="rt"><div class="pw">${plateHTML(p,'14px')}</div><div class="meta"><div class="rl">${RAR[p.rar].n}</div><div class="rn">${flag(p.c)} ${p.regName}</div>${extra}</div></div>${foot||''}</div>`;
+function rowHTML(p,extra,foot,pre,cls){
+  return `<div class="row glass r${p.rar}${cls?' '+cls:''}" data-id="${p.id}"><div class="rt">${pre||''}<div class="pw">${plateHTML(p,'14px')}</div><div class="meta"><div class="rl">${RAR[p.rar].n}</div><div class="rn">${flag(p.c)} ${p.regName}</div>${extra}</div></div>${foot||''}</div>`;
 }
+const GSORTS={rar:['Редкие',(a,b)=>b.rar-a.rar||b.v-a.v],val:['Дорогие',(a,b)=>b.v-a.v],cheap:['Дешёвые',(a,b)=>a.v-b.v],new:['Новые',(a,b)=>(b.t||Date.now())-(a.t||Date.now())]};
+let gmode=false;const GSEL=new Set();
+const gShown=()=>S.inv.filter(p=>S.gfilter==='ALL'||p.c===S.gfilter).sort(GSORTS[S.gsort][1]);
 function renderGarage(){
-  const inv=[...S.inv].sort((a,b)=>b.rar-a.rar||b.v-a.v);
-  $('#g-count').textContent=inv.length;
-  $('#g-total').textContent=fmt(inv.reduce((s,p)=>s+p.v,0));
-  $('#g-list').innerHTML=inv.length?inv.map(p=>rowHTML(p,`<div class="val"><i class="coin"></i>${fmt(p.v)}${p.st==='listed'?'<span class="bdg a" style="height:22px;padding:0 8px;border-radius:11px;font-size:11px;display:inline-flex;align-items:center;margin-left:8px">На рынке</span>':''}</div>`)).join(''):'<div class="empty"><b>Гараж пуст</b>Крутите рулетку или купите номер на рынке.</div>';
+  const all=S.inv;
+  $('#g-count').textContent=all.length;
+  $('#g-total').textContent=fmt(all.reduce((s,p)=>s+p.v,0));
+  const own=new Set(all.filter(p=>p.st==='own').map(p=>p.id));
+  [...GSEL].forEach(id=>{if(!own.has(id))GSEL.delete(id)});
+  $('#chips-garage').innerHTML=chipsHTML(S.gfilter);
+  $('#g-sort-l').textContent=GSORTS[S.gsort][0];
+  const sb=$('#g-sel');sb.textContent=gmode?'Готово':'Выбрать';sb.classList.toggle('on',gmode);
+  $('#g-quick').style.display=gmode?'none':'';
+  const list=gShown();
+  $('#g-list').innerHTML=list.length?list.map(p=>{
+    const listed=p.st==='listed';
+    return rowHTML(p,`<div class="val"><i class="coin"></i>${fmt(p.v)}${listed?'<span class="bdg a" style="height:22px;padding:0 8px;border-radius:11px;font-size:11px;display:inline-flex;align-items:center;margin-left:8px">На рынке</span>':''}</div>`,'',gmode?CHK:'',gmode?(listed?'lk':GSEL.has(p.id)?'sel':''):'');
+  }).join(''):(all.length?'<div class="empty"><b>Нет номеров</b>В этой стране у вас пока ничего нет.</div>':'<div class="empty"><b>Гараж пуст</b>Крутите рулетку или купите номер на рынке.</div>');
+  paintGBar();
 }
-$('#g-list').onclick=e=>{const r=e.target.closest('.row');if(r){hapI();openSheet(r.dataset.id)}};
+function paintGBar(){
+  const bar=$('#g-bar');bar.classList.toggle('on',gmode);
+  if(!gmode)return;
+  const sel=S.inv.filter(p=>GSEL.has(p.id)&&p.st==='own'),sum=sel.reduce((a,p)=>a+qs(p),0);
+  const shown=gShown().filter(p=>p.st==='own');
+  const allOn=shown.length>0&&shown.every(p=>GSEL.has(p.id));
+  $('#gb-n').innerHTML=sel.length?`Выбрано <b>${sel.length}</b> · оценка ${fmt(sel.reduce((a,p)=>a+p.v,0))}`:'Выберите номера';
+  const ba=$('#gb-all');ba.textContent=allOn?'Снять все':'Выбрать все';ba.style.visibility=shown.length?'':'hidden';
+  const sb=$('#gb-sell');sb.disabled=!sel.length;sb.textContent=sel.length?`Продать · +${fmt(sum)}`:'Продать';
+  const slots=Math.max(0,MAX_LOTS-S.lotsN),mb=$('#gb-mk');
+  mb.disabled=!sel.length||slots===0;mb.textContent=slots===0?'Лимит лотов':'На рынок −7%';
+}
+function gExit(){gmode=false;GSEL.clear();renderGarage()}
+$('#g-list').onclick=e=>{
+  const r=e.target.closest('.row');if(!r)return;
+  const id=r.dataset.id;
+  if(gmode){
+    const p=S.inv.find(x=>x.id===id);if(!p)return;
+    if(p.st!=='own'){toast('Номер на рынке');return}
+    hapS();GSEL.has(id)?GSEL.delete(id):GSEL.add(id);
+    r.classList.toggle('sel',GSEL.has(id));paintGBar();return;
+  }
+  hapI();openSheet(id);
+};
+$('#chips-garage').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;S.gfilter=b.dataset.k;save();renderGarage();hapS()};
+$('#g-sort').onclick=()=>{const k=Object.keys(GSORTS);S.gsort=k[(k.indexOf(S.gsort)+1)%k.length];save();renderGarage();hapS()};
+$('#g-sel').onclick=()=>{hapS();gmode?gExit():(gmode=true,renderGarage())};
+$('#gb-all').onclick=()=>{
+  hapS();const shown=gShown().filter(p=>p.st==='own'),allOn=shown.length>0&&shown.every(p=>GSEL.has(p.id));
+  shown.forEach(p=>allOn?GSEL.delete(p.id):GSEL.add(p.id));renderGarage();
+};
+async function sellMany(ids){
+  let n=0,g=0;
+  for(let i=0;i<ids.length;i+=60){
+    const r=await sellIds(ids.slice(i,i+60));
+    if(!r)break;n+=r.sold.length;g+=r.gained;
+  }
+  return{n,g};
+}
+$('#gb-sell').onclick=async e=>{
+  const b=e.currentTarget;if(b.disabled)return;
+  const ids=S.inv.filter(p=>GSEL.has(p.id)&&p.st==='own').map(p=>p.id);if(!ids.length)return;
+  if(!arm(b,'Нажмите ещё раз для продажи')){hapS();return}
+  b.disabled=true;
+  const r=await sellMany(ids);
+  if(r.n){toast(`Продано ${r.n} ${plural(r.n,'номер','номера','номеров')} · +${fmt(r.g)}`);hapN('success')}
+  gExit();
+};
+$('#gb-mk').onclick=async e=>{
+  const b=e.currentTarget;if(b.disabled)return;
+  const slots=MAX_LOTS-S.lotsN;
+  const ps=S.inv.filter(p=>GSEL.has(p.id)&&p.st==='own').sort((a,c)=>c.v-a.v);if(!ps.length)return;
+  const take=ps.slice(0,slots);
+  if(!arm(b,take.length<ps.length?`Выставим ${take.length} из ${ps.length}. Ещё раз`:`Выставить ${take.length}? Ещё раз`)){hapS();return}
+  b.disabled=true;let ok=0;
+  for(const p of take){
+    const price=Math.min(Math.max(nice(p.v*.93),slMin(p)),slMax(p));
+    try{await api('POST','/api/list',{plateId:p.id,price});p.st='listed';S.lotsN++;ok++}
+    catch(err){errToast(err);if(err.error==='gone'||err.error==='limit')refreshMe();break}
+  }
+  paintMCount();
+  if(ok){toast(`Выставлено ${ok}${ok<ps.length?' из '+ps.length:''} · −7% к оценке`);hapN('success')}
+  gExit();
+};
+/* быстрая продажа пачкой */
+const QS_OPT=[[0,'Все обычные'],[1,'Обычные и необычные'],[2,'Всё до редких']];
+function openQuick(){
+  const own=S.inv.filter(p=>p.st==='own');
+  $('#qs').innerHTML=`<div class="grab"></div><h3>Быстрая продажа</h3>
+    <p class="hint" style="margin-top:6px">Продаём системе за ${Math.round(SELL*100)}% оценки. Номера на рынке и эпичные и выше не трогаем.</p>`+
+    QS_OPT.map(([m,l])=>{const a=own.filter(p=>p.rar<=m),sum=a.reduce((s,p)=>s+qs(p),0);return `<button class="btn qo" data-m="${m}" ${a.length?'':'disabled'}>${l}${a.length?` · ${a.length} шт · +${fmt(sum)}`:' · нет'}</button>`}).join('')+
+    `<button class="btn wide" id="qs-x" style="margin-top:12px">Закрыть</button>`;
+  $('#qs-x').onclick=()=>hide('#ov-qs');
+  $('#qs').onclick=async e=>{
+    const b=e.target.closest('.qo');if(!b||b.disabled)return;
+    if(!arm(b,'Нажмите ещё раз, чтобы продать')){hapS();return}
+    const m=+b.dataset.m,ids=S.inv.filter(p=>p.st==='own'&&p.rar<=m).map(p=>p.id);
+    hide('#ov-qs');
+    const r=await sellMany(ids);
+    if(r.n){toast(`Продано ${r.n} ${plural(r.n,'номер','номера','номеров')} · +${fmt(r.g)}`);hapN('success')}
+  };
+  show('#ov-qs');
+}
+$('#g-quick').onclick=()=>{hapI();openQuick()};
+$('#ov-qs').onclick=e=>{if(e.target.id==='ov-qs')hide('#ov-qs')};
 function openSheet(id){
   const p=S.inv.find(x=>x.id===id);if(!p)return;
   if(p.st==='listed'){toast('Номер на рынке. Снять можно в «Мои лоты»');return}
