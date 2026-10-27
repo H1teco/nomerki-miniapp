@@ -287,6 +287,33 @@ h3{font:600 15px 'Onest',sans-serif;text-transform:none;letter-spacing:0;color:v
 .sh{background:#0e121c}
 .tag{font-family:'Onest',sans-serif}
 .est b{font-family:'Unbounded',sans-serif;font-weight:500}
+
+/* ===== v3: экран рулетки без прокрутки, переключатель рулеток ===== */
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+main{display:flex;flex-direction:column}
+.tab.on{flex:none}
+#t-spin.on{display:flex;flex-direction:column;flex:1;min-height:330px}
+.machine{height:auto;flex:1;min-height:200px;margin-top:12px}
+.tsw{margin-top:12px;height:64px;flex:none;border-radius:20px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;padding:0 8px}
+.tsw .ar{width:48px;height:48px;border-radius:16px;border:0;background:none;color:var(--tx);display:flex;align-items:center;justify-content:center;flex:none;padding:0}
+.tsw .ar:active{background:rgba(255,255,255,.06)}
+.tsw .ar svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tsw .mid{flex:1;min-width:0;height:48px;border:0;background:none;color:var(--tx);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
+.tsw .tn{display:flex;align-items:center;gap:8px;font:700 15px 'Onest',sans-serif}
+.tsw .tn i{width:8px;height:8px;border-radius:50%;flex:none}
+.tsw .tn svg{width:12px;height:12px;stroke:var(--mut);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tsw .ts{font-size:12px;color:var(--mut)}
+.spin{margin-top:12px;flex:none}
+.opt{display:flex;align-items:center;gap:14px;height:68px;padding:0 16px;border-radius:20px;background:var(--card);border:1px solid var(--line);width:100%;color:var(--tx);text-align:left;margin-top:8px}
+.opt .t{flex:1;min-width:0}
+.opt .n{font:600 15px 'Onest',sans-serif}
+.opt .s{margin-top:3px;font-size:12px;color:var(--mut)}
+.opt .p{display:flex;align-items:center;gap:6px;font:500 14px 'Unbounded',sans-serif}
+.opt .p .coin{width:14px;height:14px}
+.opt .d{width:10px;height:10px;border-radius:50%;flex:none}
+.opt.on{background:#18200f;border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+.opt.on::after{content:'';width:18px;height:18px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18' fill='none' stroke='%23c8f03c' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 9.5l3.5 3.5 7.5-8'/%3E%3C/svg%3E") center/contain no-repeat}
+.sh h4{margin:0 0 6px;font:700 20px 'Onest',sans-serif;text-align:left}
 </style>
 </head>
 <body>
@@ -313,12 +340,12 @@ h3{font:600 15px 'Onest',sans-serif;text-transform:none;letter-spacing:0;color:v
         <div class="mp" id="mp"></div>
         <div class="stages" id="stages"><span data-s="d">Цифры</span><i></i><span data-s="l">Буквы</span><i></i><span data-s="r">Регион</span></div>
       </div>
-      <h3>Рулетка</h3>
-      <div class="tiers" id="tiers"></div>
-      <div id="odds-wrap" style="margin-top:14px"><div class="obar" id="obar"></div><div class="odds" id="odds"></div></div>
+      <div class="tsw" role="group" aria-label="Рулетка">
+        <button class="ar" id="t-prev" aria-label="Предыдущая рулетка"><svg viewBox="0 0 18 18"><path d="M11 4L6 9l5 5"/></svg></button>
+        <button class="mid" id="t-open" aria-haspopup="dialog"><span class="tn"><i id="t-dot"></i><span id="t-name"></span><svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5l3-3"/></svg></span><span class="ts" id="t-sub"></span></button>
+        <button class="ar" id="t-next" aria-label="Следующая рулетка"><svg viewBox="0 0 18 18"><path d="M7 4l5 5-5 5"/></svg></button>
+      </div>
       <button class="spin" id="spin"><span>Крутить</span><span class="cost"><i class="coin"></i><span id="cost">1 000</span></span></button>
-      <h3>Последние выпавшие</h3>
-      <div id="recent"></div>
     </section>
 
     <section class="tab" id="t-garage">
@@ -342,6 +369,8 @@ h3{font:600 15px 'Onest',sans-serif;text-transform:none;letter-spacing:0;color:v
         <div class="stat glass"><small>Номеров</small><b id="p-count">0</b></div>
         <div class="stat glass"><small>Оценка гаража</small><b><i class="coin"></i><span id="p-total">0</span></b></div>
       </div>
+      <h3>Последние выпавшие</h3>
+      <div id="recent"></div>
       <button class="btn pbtn" id="p-bonus"><span>Ежедневный бонус</span><span id="p-bonus-l" style="color:var(--mut);font-size:13px"></span></button>
       <button class="dbg" id="dbg">+50 000 монет · тестовая кнопка</button>
     </section>
@@ -352,7 +381,7 @@ h3{font:600 15px 'Onest',sans-serif;text-transform:none;letter-spacing:0;color:v
         <button class="refresh" id="m-refresh" aria-label="Обновить"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
       </div>
       <p class="mut">Лоты других игроков. Цена может быть выше оценки.</p>
-      <div class="chips" id="chips-market"></div>
+      <div class="cs" id="chips-market"></div>
       <div id="m-list" style="margin-top:12px"></div>
     </section>
   </main>
@@ -387,6 +416,7 @@ h3{font:600 15px 'Onest',sans-serif;text-transform:none;letter-spacing:0;color:v
 </div>
 
 <div class="ov sheet" id="ov-sh"><div class="sh" id="sh"></div></div>
+<div class="ov sheet" id="ov-tr"><div class="sh" id="tr"></div></div>
 <div id="fx"></div>
 <div id="toast"></div>
 
@@ -638,19 +668,33 @@ $('#gift').onclick=()=>{
 
 /* ---------- чипы, страны, рулетки ---------- */
 function chipsHTML(active){
-  return CHIPS.map(([k,n])=>`<button class="chip${k===active?' on':''}" data-k="${k}">${k==='ALL'?'<i class="globe"></i>':flag(k)}${n}</button>`).join('');
+  return CHIPS.map(([k,n])=>`<button class="chip ctile${k===active?' on':''}" data-k="${k}">${k==='ALL'?'<i class="globe"></i>Все':flag(k)+k}</button>`).join('');
 }
 function renderChips(){
   $('#chips-spin').innerHTML=['KZ','RU','UA','BY'].map(k=>`<button class="ctile${k===S.filter?' on':''}" data-k="${k}"><i class="fl ${k.toLowerCase()} fb"></i><span>${k}</span></button>`).join('');
   $('#chips-market').innerHTML=chipsHTML(S.mfilter);
 }
 function renderTiers(){
-  $('#tiers').innerHTML=TIERS.map((t,i)=>{const fl=t.w.findIndex(x=>x>0);return `<button class="tier${i===S.tier?' on':''}" data-i="${i}"><b>${t.n}</b><span><i class="coin"></i>${fmt(t.price)}</span><small><i style="background:${RCOL[fl]}"></i>${t.note}</small></button>`}).join('');
-  $('#cost').textContent=fmt(TIERS[S.tier].price);
-  $('#obar').innerHTML=TIERS[S.tier].w.map((w,i)=>w>0?`<i class="r${i}" style="flex:${w}"></i>`:'').join('');
-  $('#odds').innerHTML=TIERS[S.tier].w.map((w,i)=>w>0?`<span class="r${i}"><i class="dot2"></i>${RAR[i].n} ${fmtp(w)}%</span>`:'').join('');
+  const t=TIERS[S.tier],fl=t.w.findIndex(x=>x>0);
+  $('#t-name').textContent=t.n;
+  $('#t-dot').style.background=RCOL[fl];
+  $('#t-sub').textContent=`${t.note} · ${S.tier+1} из ${TIERS.length}`;
+  $('#cost').textContent=fmt(t.price);
 }
-$('#tiers').onclick=e=>{const b=e.target.closest('.tier');if(!b||spinning)return;S.tier=+b.dataset.i;save();renderTiers();hapS()};
+function setTier(i){
+  if(spinning)return;
+  S.tier=(i+TIERS.length)%TIERS.length;save();renderTiers();hapS();
+}
+$('#t-prev').onclick=()=>setTier(S.tier-1);
+$('#t-next').onclick=()=>setTier(S.tier+1);
+function openTiers(){
+  $('#tr').innerHTML=`<div class="grab"></div><h4>Рулетка</h4><p class="mut" style="text-align:left;margin:0 0 6px">Чем дороже рулетка, тем выше минимальное качество.</p>`+
+    TIERS.map((t,i)=>`<button class="opt${i===S.tier?' on':''}" data-i="${i}"><i class="d" style="background:${RCOL[t.w.findIndex(x=>x>0)]}"></i><span class="t"><div class="n">${t.n}</div><div class="s">${t.note}</div></span><span class="p"><i class="coin"></i>${fmt(t.price)}</span></button>`).join('');
+  show('#ov-tr');
+}
+$('#t-open').onclick=()=>{if(!spinning){hapI();openTiers()}};
+$('#tr').onclick=e=>{const b=e.target.closest('.opt');if(!b)return;S.tier=+b.dataset.i;save();renderTiers();hide('#ov-tr');hapS()};
+$('#ov-tr').onclick=e=>{if(e.target.id==='ov-tr')hide('#ov-tr')};
 
 /* ---------- барабаны ---------- */
 const mp=$('#mp'),btn=$('#spin'),stagesEl=$('#stages');
@@ -895,6 +939,17 @@ function go(name){
 }
 document.querySelectorAll('.bar button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
 window.addEventListener('resize',()=>{if(!spinning)remeasure()});
+
+/* ---------- без масштабирования ---------- */
+document.addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault()},{passive:false});
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&['+','-','=','_','0','Add','Subtract'].includes(e.key))e.preventDefault();
+  if(!e.ctrlKey&&!e.metaKey&&!e.altKey&&$('#t-spin').classList.contains('on')&&!$('#ov-rv').classList.contains('on')&&!$('#ov-tr').classList.contains('on')){
+    if(e.key==='ArrowLeft')setTier(S.tier-1);else if(e.key==='ArrowRight')setTier(S.tier+1);
+  }
+});
+['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t,e=>e.preventDefault()));
+document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
 
 /* ---------- старт ---------- */
 try{document.fonts&&document.fonts.ready.then(()=>{if(!spinning&&slots.length)remeasure();document.querySelectorAll('.plate:not(.slots)').forEach(p=>p._fk=null);queueFit()})}catch(e){}
