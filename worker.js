@@ -1,7 +1,7 @@
 /* Номерки — сервер игры. Cloudflare Worker + D1. Секрет: BOT_TOKEN. Привязка D1: DB. */
 const rnd=n=>Math.floor(Math.random()*n), pick=a=>a[rnd(a.length)], R=(a,b)=>a+rnd(b-a+1);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-const BONUS=1500, START_COINS=5000, SELL=.8;
+const BONUS=1500, START_COINS=20000, SELL=.8;
 const RAR=[{n:'Обычный'},{n:'Необычный'},{n:'Редкий'},{n:'Эпичный'},{n:'Легендарный'},{n:'Мифический'}];
 /* базовая оценка по качеству; итог = база × регион × (0,98…1,18) */
 const BASE=[900,2400,5800,11800,24500,80000];
@@ -167,6 +167,14 @@ function rollPlate(country,w){
 
 /* ================= API ================= */
 const COMM=5, LOT_TTL=864e5, MAX_LOTS=10, DAY=864e5;
+/* сутки считаем по Астане (UTC+5) */
+const TZ=5*36e5, dayNum=t=>Math.floor((t+TZ)/DAY), dayEnd=t=>(dayNum(t)+1)*DAY-TZ;
+/* серия: 7 дней, на седьмой — главный приз */
+const REWARDS=[5000,7500,10000,15000,20000,30000,100000];
+/* колесо: [приз, вес]; порядок = порядок секторов на экране */
+const WHEEL=[[500,28],[4000,8],[1000,24],[15000,3.5],[1500,18],[7500,5],[2500,12],[50000,1.5]];
+const WEBAPP='https://h1teco.github.io/nomerki-miniapp/';
+const TG=env=>env.TG_API||'https://api.telegram.org';
 const ORIGINS=['https://h1teco.github.io'];
 const DDL=[
  `CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name TEXT,coins INTEGER NOT NULL,spins INTEGER NOT NULL DEFAULT 0,bonus_at INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,seen INTEGER NOT NULL DEFAULT 0,banned INTEGER NOT NULL DEFAULT 0)`,
@@ -175,10 +183,13 @@ const DDL=[
  `CREATE TABLE IF NOT EXISTS lots(id TEXT PRIMARY KEY,plate_id TEXT NOT NULL,seller INTEGER NOT NULL,seller_name TEXT,price INTEGER NOT NULL,st TEXT NOT NULL DEFAULT 'active',settled INTEGER NOT NULL DEFAULT 0,buyer INTEGER,buyer_name TEXT,created INTEGER NOT NULL,expires INTEGER NOT NULL,sold_at INTEGER,c TEXT,rar INTEGER,v INTEGER)`,
  `CREATE INDEX IF NOT EXISTS lots_active ON lots(st,c)`,
  `CREATE INDEX IF NOT EXISTS lots_seller ON lots(seller,st)`,
- `CREATE TABLE IF NOT EXISTS issued(k TEXT PRIMARY KEY,ts INTEGER NOT NULL)`
+ `CREATE TABLE IF NOT EXISTS issued(k TEXT PRIMARY KEY,ts INTEGER NOT NULL)`,
+ `CREATE TABLE IF NOT EXISTS promos(code TEXT PRIMARY KEY,coins INTEGER NOT NULL,max INTEGER NOT NULL DEFAULT 0,used INTEGER NOT NULL DEFAULT 0,expires INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 1,created INTEGER NOT NULL)`,
+ `CREATE TABLE IF NOT EXISTS promo_uses(code TEXT NOT NULL,user INTEGER NOT NULL,at INTEGER NOT NULL,PRIMARY KEY(code,user))`,
+ `CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY,v TEXT)`
 ];
 let ready=null,lastClean=0;
-const MIG=['ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0'];
+const MIG=['ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN streak INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN last_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wheel_day INTEGER NOT NULL DEFAULT 0'];
 const init=env=>ready||(ready=(async()=>{
   await env.DB.batch(DDL.map(s=>env.DB.prepare(s)));
   for(const m of MIG){try{await env.DB.prepare(m).run()}catch(e){if(!/duplicate column/i.test(String(e&&e.message||e)))throw e}}
@@ -217,10 +228,10 @@ async function auth(req,env){
   return{id:u.id,name:u.username?'@'+u.username:(u.first_name||'Игрок')};
 }
 async function getUser(env,a,now){
-  let u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at,banned FROM users WHERE id=?').bind(a.id).first();
+  let u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at,banned,streak,last_day,wheel_day FROM users WHERE id=?').bind(a.id).first();
   if(!u){
     await env.DB.prepare('INSERT OR IGNORE INTO users(id,name,coins,created) VALUES(?,?,?,?)').bind(a.id,a.name,START_COINS,now).run();
-    u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at,banned FROM users WHERE id=?').bind(a.id).first();
+    u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at,banned,streak,last_day,wheel_day FROM users WHERE id=?').bind(a.id).first();
   }else if(u.name!==a.name){
     await env.DB.prepare('UPDATE users SET name=? WHERE id=?').bind(a.name,a.id).run();u.name=a.name;
   }
@@ -229,7 +240,19 @@ async function getUser(env,a,now){
 const strip=p=>{const{id,paid,...r}=p;return r};
 const plateOf=r=>({...JSON.parse(r.data),id:r.id,st:r.st});
 const lotPlate=r=>({...JSON.parse(r.data),id:r.plate_id});
-const userOut=(u,env)=>({id:u.id,name:u.name,coins:u.coins,spins:u.spins,bonusAt:u.bonus_at,admin:isAdmin(env,u.id)});
+const userOut=(u,env)=>({id:u.id,name:u.name,coins:u.coins,spins:u.spins,admin:isAdmin(env,u.id)});
+function dailyOf(u,now){
+  const t=dayNum(now);
+  if(u.last_day===t)return{rewards:REWARDS,claimed:true,done:u.streak,next:null};
+  const done=u.last_day===t-1?u.streak%7:0;
+  return{rewards:REWARDS,claimed:false,done,next:done+1};
+}
+const wheelOf=(u,now)=>({prizes:WHEEL.map(w=>w[0]),available:u.wheel_day<dayNum(now)});
+function rnd100(){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296*100}
+function pickWheel(){let r=rnd100(),sum=WHEEL.reduce((a,w)=>a+w[1],0);r=r/100*sum;for(let i=0;i<WHEEL.length;i++){r-=WHEEL[i][1];if(r<0)return i}return WHEEL.length-1}
+const normCode=x=>String(x==null?'':x).trim().toUpperCase();
+const CODE_RE=/^[\p{L}\d_-]{3,24}$/u;
+const promoFail=new Map();
 const coinsOf=async(env,id)=>(await env.DB.prepare('SELECT coins FROM users WHERE id=?').bind(id).first()).coins;
 
 async function housekeeping(env,now){
@@ -320,6 +343,34 @@ const routes={
     if(res[0].meta.changes!==1)throw new HttpErr(410,'gone');
     return{ok:true};
   },
+  async 'GET /api/admin/promos'(env,u,url,now){
+    needAdmin(env,u);
+    const rows=(await env.DB.prepare('SELECT code,coins,max,used,expires,active,created FROM promos ORDER BY created DESC LIMIT 100').all()).results;
+    return{promos:rows.map(r=>({code:r.code,coins:r.coins,max:r.max,used:r.used,expires:r.expires,active:!!r.active,created:r.created}))};
+  },
+  async 'POST /api/admin/promo'(env,u,url,now,b){
+    needAdmin(env,u);
+    let code=normCode(b.code);
+    if(!code){const al='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',a=new Uint8Array(8);crypto.getRandomValues(a);code=[...a].map(x=>al[x%al.length]).join('')}
+    if(!CODE_RE.test(code))throw new HttpErr(400,'bad');
+    const coins=int(b.coins,1,1e9),max=int(b.max||0,0,1e7),days=int(b.days||0,0,3650);
+    const r=await env.DB.prepare('INSERT OR IGNORE INTO promos(code,coins,max,expires,created) VALUES(?,?,?,?,?)').bind(code,coins,max,days?now+days*DAY:0,now).run();
+    if(r.meta.changes!==1)throw new HttpErr(409,'exists');
+    return{code};
+  },
+  async 'POST /api/admin/promo-toggle'(env,u,url,now,b){
+    needAdmin(env,u);
+    const r=await env.DB.prepare('UPDATE promos SET active=? WHERE code=?').bind(b.active?1:0,normCode(b.code)).run();
+    if(r.meta.changes!==1)throw new HttpErr(404,'nopromo');
+    return{active:!!b.active};
+  },
+  async 'POST /api/admin/promo-del'(env,u,url,now,b){
+    needAdmin(env,u);
+    const code=normCode(b.code);
+    const res=await env.DB.batch([env.DB.prepare('DELETE FROM promos WHERE code=?').bind(code),env.DB.prepare('DELETE FROM promo_uses WHERE code=?').bind(code)]);
+    if(res[0].meta.changes!==1)throw new HttpErr(404,'nopromo');
+    return{ok:true};
+  },
   async 'GET /api/me'(env,u,url,now){
     await housekeeping(env,now);
     const sq=url.searchParams.get('since'),since=sq===null?now:+sq||0;
@@ -329,7 +380,7 @@ const routes={
       env.DB.prepare(`SELECT COUNT(*) n,COALESCE(SUM(price*${100-COMM}/100),0) net FROM lots WHERE seller=? AND st='sold' AND sold_at>?`).bind(u.id,since).first()
     ]);
     await env.DB.prepare('UPDATE users SET seen=? WHERE id=?').bind(now,u.id).run();
-    return{user:userOut(u,env),inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},now};
+    return{user:userOut(u,env),inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},daily:dailyOf(u,now),wheel:wheelOf(u,now),reset:dayEnd(now),now};
   },
   async 'POST /api/spin'(env,u,url,now,b){
     const c=String(b.c);if(!C[c])throw new HttpErr(400,'bad');
@@ -358,10 +409,44 @@ const routes={
     rows.forEach((r,i)=>{if(res[i*2+1].meta.changes===1){sold.push(r.id);gained+=Math.floor(r.v*SELL)}});
     return{coins:await coinsOf(env,u.id),sold,gained};
   },
-  async 'POST /api/bonus'(env,u,url,now){
-    const r=await env.DB.prepare('UPDATE users SET coins=coins+?,bonus_at=? WHERE id=? AND bonus_at<=?').bind(BONUS,now,u.id,now-DAY).run();
-    if(r.meta.changes!==1)throw new HttpErr(429,'wait',{left:Math.max(0,u.bonus_at+DAY-now)});
-    return{coins:u.coins+BONUS,bonusAt:now,gained:BONUS};
+  async 'POST /api/daily'(env,u,url,now){
+    const t=dayNum(now),d=dailyOf(u,now);
+    if(d.claimed)throw new HttpErr(429,'wait',{reset:dayEnd(now)});
+    const gain=REWARDS[d.next-1];
+    const r=await env.DB.prepare('UPDATE users SET coins=coins+?,streak=?,last_day=? WHERE id=? AND last_day<?').bind(gain,d.next,t,u.id,t).run();
+    if(r.meta.changes!==1)throw new HttpErr(429,'wait',{reset:dayEnd(now)});
+    const u2={...u,streak:d.next,last_day:t};
+    return{coins:u.coins+gain,gained:gain,day:d.next,daily:dailyOf(u2,now),reset:dayEnd(now)};
+  },
+  async 'POST /api/wheel'(env,u,url,now){
+    const t=dayNum(now);
+    if(u.wheel_day>=t)throw new HttpErr(429,'wait',{reset:dayEnd(now)});
+    const idx=pickWheel(),gain=WHEEL[idx][0];
+    const r=await env.DB.prepare('UPDATE users SET coins=coins+?,wheel_day=? WHERE id=? AND wheel_day<?').bind(gain,t,u.id,t).run();
+    if(r.meta.changes!==1)throw new HttpErr(429,'wait',{reset:dayEnd(now)});
+    return{coins:u.coins+gain,gained:gain,idx,reset:dayEnd(now)};
+  },
+  async 'POST /api/promo'(env,u,url,now,b){
+    const bad=promoFail.get(u.id)||[];const recent=bad.filter(x=>now-x<6e5);
+    if(recent.length>=8)throw new HttpErr(429,'slow');
+    const code=normCode(b.code);
+    const fail=(s,c)=>{recent.push(now);promoFail.set(u.id,recent);throw new HttpErr(s,c)};
+    if(!CODE_RE.test(code))fail(404,'nopromo');
+    const has="EXISTS(SELECT 1 FROM promo_uses WHERE code=? AND user=? AND at=?)";
+    const res=await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO promo_uses(code,user,at) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM promos WHERE code=? AND active=1 AND (expires=0 OR expires>?) AND (max=0 OR used<max))").bind(code,u.id,now,code,now),
+      env.DB.prepare(`UPDATE promos SET used=used+1 WHERE code=? AND ${has}`).bind(code,code,u.id,now),
+      env.DB.prepare(`UPDATE users SET coins=coins+(SELECT coins FROM promos WHERE code=?) WHERE id=? AND ${has}`).bind(code,u.id,code,u.id,now)
+    ]);
+    if(res[0].meta.changes!==1){
+      const p=await env.DB.prepare('SELECT code FROM promos WHERE code=?').bind(code).first();
+      if(!p)fail(404,'nopromo');
+      const used=await env.DB.prepare('SELECT 1 x FROM promo_uses WHERE code=? AND user=?').bind(code,u.id).first();
+      if(used)throw new HttpErr(409,'promo_used');
+      throw new HttpErr(410,'promo_over');
+    }
+    const p=await env.DB.prepare('SELECT coins FROM promos WHERE code=?').bind(code).first();
+    return{coins:await coinsOf(env,u.id),gained:p.coins};
   },
   async 'GET /api/market'(env,u,url,now){
     await housekeeping(env,now);
@@ -425,13 +510,58 @@ const routes={
   }
 };
 
+/* ---------- бот: /start ---------- */
+const fmtN=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+const WELCOME=()=>`🚗 <b>Гараж номеров</b>
+
+Крутите рулетку автомобильных номеров Казахстана, России, Украины и Беларуси. Редкие номера оставляйте себе или продавайте другим игрокам за монеты.
+
+🎁 Стартовый баланс — ${fmtN(START_COINS)} монет
+📅 Заходите каждый день: награды растут до ${fmtN(REWARDS[6])} монет за неделю
+🎡 Бесплатное колесо удачи раз в сутки
+🎟 Промокоды на монеты
+
+Нажмите «Играть», чтобы начать.`;
+const hookSecret=async env=>{const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('hook:'+env.BOT_TOKEN));return[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,48)};
+async function tgCall(env,method,body){
+  const r=await fetch(`${TG(env)}/bot${env.BOT_TOKEN}/${method}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  return r.json().catch(()=>({}));
+}
+async function onHook(req,env){
+  if(!env.BOT_TOKEN)return new Response('no',{status:500});
+  const sec=req.headers.get('x-telegram-bot-api-secret-token')||'',want=await hookSecret(env);
+  let d=sec.length^want.length;for(let i=0;i<want.length;i++)d|=sec.charCodeAt(i)^(want.charCodeAt(i));
+  if(d!==0)return new Response('forbidden',{status:403});
+  let up={};try{up=await req.json()}catch(e){}
+  const m=up&&up.message;
+  if(m&&m.chat&&m.chat.type==='private'&&!(m.from&&m.from.is_bot)){
+    try{await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:WELCOME(),parse_mode:'HTML',disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:'🎮 Играть',web_app:{url:WEBAPP}}]]}})}catch(e){console.log('TG',e&&e.message)}
+  }
+  return new Response('ok');
+}
+let whAt=0;
+async function ensureWebhook(env,origin){
+  if(!env.BOT_TOKEN||Date.now()-whAt<6e5)return;whAt=Date.now();
+  try{
+    await init(env);
+    const want=origin+'/tg/hook|v1|'+await hookSecret(env);
+    const cur=await env.DB.prepare("SELECT v FROM meta WHERE k='wh'").first();
+    if(cur&&cur.v===want)return;
+    const r=await tgCall(env,'setWebhook',{url:origin+'/tg/hook',secret_token:await hookSecret(env),allowed_updates:['message'],max_connections:20});
+    if(r&&r.ok)await env.DB.prepare("INSERT INTO meta(k,v) VALUES('wh',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(want).run();
+    else console.log('setWebhook failed',JSON.stringify(r));
+  }catch(e){console.log('wh',e&&e.message)}
+}
+
 export default{
-  async fetch(req,env){
+  async fetch(req,env,ctx){
     const h=cors(req,env);
     if(req.method==='OPTIONS')return new Response(null,{status:204,headers:h});
     const out=(o,s)=>new Response(JSON.stringify(o),{status:s||200,headers:{'content-type':'application/json','cache-control':'no-store',...h}});
     try{
       const url=new URL(req.url),key=req.method+' '+url.pathname;
+      if(ctx&&ctx.waitUntil)ctx.waitUntil(ensureWebhook(env,url.origin));
+      if(key==='POST /tg/hook'){await init(env);return await onHook(req,env)}
       if(key==='GET /api/ping')return out({ok:true});
       const fn=routes[key];if(!fn)return out({error:'notfound'},404);
       await init(env);
