@@ -176,6 +176,9 @@ const WHEEL=[[500,28],[4000,8],[1000,24],[15000,3.5],[1500,18],[7500,5],[2500,12
 const WEBAPP='https://h1teco.github.io/nomerki-miniapp/';
 const TG=env=>env.TG_API||'https://api.telegram.org';
 const ORIGINS=['https://h1teco.github.io'];
+/* обязательная подписка на канал */
+const CHANNEL_URL='https://t.me/layerplates';
+const chanOf=env=>env.CHANNEL||'@layerplates';
 const DDL=[
  `CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name TEXT,coins INTEGER NOT NULL,spins INTEGER NOT NULL DEFAULT 0,bonus_at INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,seen INTEGER NOT NULL DEFAULT 0,banned INTEGER NOT NULL DEFAULT 0)`,
  `CREATE TABLE IF NOT EXISTS plates(id TEXT PRIMARY KEY,owner INTEGER NOT NULL,st TEXT NOT NULL DEFAULT 'own',c TEXT NOT NULL,rar INTEGER NOT NULL,v INTEGER NOT NULL,data TEXT NOT NULL,created INTEGER NOT NULL)`,
@@ -380,7 +383,7 @@ const routes={
       env.DB.prepare(`SELECT COUNT(*) n,COALESCE(SUM(price*${100-COMM}/100),0) net FROM lots WHERE seller=? AND st='sold' AND sold_at>?`).bind(u.id,since).first()
     ]);
     await env.DB.prepare('UPDATE users SET seen=? WHERE id=?').bind(now,u.id).run();
-    return{user:userOut(u,env),inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},daily:dailyOf(u,now),wheel:wheelOf(u,now),reset:dayEnd(now),now};
+    return{user:{...userOut(u,env),subWarn:isAdmin(env,u.id)&&subErr>0&&now-subErr<36e5},inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},daily:dailyOf(u,now),wheel:wheelOf(u,now),reset:dayEnd(now),now};
   },
   async 'POST /api/spin'(env,u,url,now,b){
     const c=String(b.c);if(!C[c])throw new HttpErr(400,'bad');
@@ -521,7 +524,28 @@ const WELCOME=()=>`🚗 <b>Гараж номеров</b>
 🎡 Бесплатное колесо удачи раз в сутки
 🎟 Промокоды на монеты
 
+📣 Для игры нужна подписка на канал @layerplates
+
 Нажмите «Играть», чтобы начать.`;
+/* проверка подписки: «да» кешируем на 5 минут, «нет» — на 3 секунды (чтобы кнопка «Проверить» работала сразу).
+   Если Telegram не отвечает или бот не админ канала — не блокируем игроков, но помечаем ошибку для админа */
+const subCache=new Map();let subErr=0;
+async function isSub(env,id,now){
+  const c=subCache.get(id);
+  if(c&&now-c.t<(c.ok?3e5:3e3))return c.ok;
+  let ok=true,cache=true;
+  try{
+    const r=await tgCall(env,'getChatMember',{chat_id:chanOf(env),user_id:id});
+    if(r&&r.ok&&r.result&&r.result.status){
+      const s=r.result.status;
+      ok=s==='creator'||s==='administrator'||s==='member'||(s==='restricted'&&r.result.is_member!==false);
+      subErr=0;
+    }else if(r&&/user not found|PARTICIPANT_ID_INVALID/i.test(String(r.description||''))){ok=false}
+    else{ok=true;cache=false;subErr=now;console.log('sub check failed',JSON.stringify(r))}
+  }catch(e){ok=true;cache=false;subErr=now;console.log('sub check error',e&&e.message)}
+  if(cache){if(subCache.size>5000)subCache.clear();subCache.set(id,{ok,t:now})}
+  return ok;
+}
 const hookSecret=async env=>{const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('hook:'+env.BOT_TOKEN));return[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,48)};
 async function tgCall(env,method,body){
   const r=await fetch(`${TG(env)}/bot${env.BOT_TOKEN}/${method}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
@@ -535,7 +559,7 @@ async function onHook(req,env){
   let up={};try{up=await req.json()}catch(e){}
   const m=up&&up.message;
   if(m&&m.chat&&m.chat.type==='private'&&!(m.from&&m.from.is_bot)){
-    try{await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:WELCOME(),parse_mode:'HTML',disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:'🎮 Играть',web_app:{url:WEBAPP}}]]}})}catch(e){console.log('TG',e&&e.message)}
+    try{await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:WELCOME(),parse_mode:'HTML',disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:'🎮 Играть',web_app:{url:WEBAPP}}],[{text:'📣 Канал',url:CHANNEL_URL}]]}})}catch(e){console.log('TG',e&&e.message)}
   }
   return new Response('ok');
 }
@@ -568,6 +592,7 @@ export default{
       const a=await auth(req,env),now=Date.now();
       const u=await getUser(env,a,now);
       if(u.banned&&!isAdmin(env,u.id))throw new HttpErr(403,'banned');
+      if(!(await isSub(env,u.id,now)))throw new HttpErr(403,'nosub',{url:CHANNEL_URL});
       let body={};
       if(req.method==='POST'){try{const t=await req.text();body=t?JSON.parse(t):{}}catch(e){throw new HttpErr(400,'bad')}}
       return out(await fn(env,u,url,now,body));

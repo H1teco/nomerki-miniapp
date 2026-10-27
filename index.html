@@ -393,6 +393,13 @@ main{display:flex;flex-direction:column}
 #ov-err h2{margin:0}
 #ov-err p{margin:0;color:var(--mut);font-size:14px;line-height:1.5;max-width:300px}
 #ov-err .btn{margin-top:8px;min-width:180px;height:50px}
+#ov-sub{z-index:90;background:#0b0e14;-webkit-backdrop-filter:none;backdrop-filter:none;flex-direction:column;text-align:center;gap:12px;padding:30px}
+#ov-sub h2{margin:0;font-size:24px}
+#ov-sub p{margin:0;color:var(--mut);font-size:14px;line-height:1.5;max-width:300px}
+#ov-sub .si{width:84px;height:84px;border-radius:26px;background:#18200f;border:1px solid var(--ac);box-shadow:0 0 0 1px var(--ac),0 0 40px -6px rgba(200,240,60,.5);display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+#ov-sub .si svg{width:40px;height:40px;stroke:var(--ac);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+#ov-sub .btn{min-width:230px;height:52px}
+#ov-sub .btn.go{margin-top:10px;background:var(--ac);color:#0b0e14;box-shadow:0 10px 28px -10px rgba(200,240,60,.7)}
 .spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--ac);animation:rot .8s linear infinite}
 @keyframes rot{to{transform:rotate(360deg)}}
 /* v5: пропуск, выбор, админка */
@@ -598,6 +605,7 @@ main{display:flex;flex-direction:column}
 <div class="ov sheet" id="ov-cn"><div class="sh" id="cn"></div></div>
 <div class="ov sheet" id="ov-pk"><div class="sh" id="pk" style="max-height:82vh;overflow-y:auto"></div></div>
 <div class="ov on" id="ov-err"><div class="spinner" id="err-sp"></div><h2 id="err-h">Загрузка…</h2><p id="err-p"></p><button class="btn gold" id="err-b" style="display:none">Повторить</button></div>
+<div class="ov" id="ov-sub"><div class="si"><svg viewBox="0 0 24 24"><path d="M21 4L3 11l6 2.2L11 20l3.2-4.4L18.5 19z"/><path d="M9 13.2L21 4"/></svg></div><h2>Подпишитесь на канал</h2><p>Игра доступна подписчикам канала <b>@layerplates</b>. Там новости игры и промокоды.</p><button class="btn go" id="sub-go">Подписаться</button><button class="btn" id="sub-ck">Я подписался</button></div>
 <div class="ov sheet" id="ov-sh"><div class="sh" id="sh"></div></div>
 <div class="ov sheet" id="ov-tr"><div class="sh" id="tr"></div></div>
 <div id="fx"></div>
@@ -826,10 +834,10 @@ async function api(m,path,body){
   catch(e){throw{error:'net'}}
   finally{clearTimeout(to)}
   let j={};try{j=await r.json()}catch(e){}
-  if(!r.ok)throw Object.assign({status:r.status},j,{error:j.error||'server'});
+  if(!r.ok){if(j.error==='nosub')showSub();throw Object.assign({status:r.status},j,{error:j.error||'server'})}
   return j;
 }
-const ERR={coins:'Не хватает монет',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Не больше '+MAX_LOTS+' лотов',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут'};
+const ERR={coins:'Не хватает монет',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Не больше '+MAX_LOTS+' лотов',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nosub:'Нужна подписка на канал',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут'};
 const errToast=e=>{toast(ERR[e&&e.error]||'Ошибка');hapN('error')};
 const hoursLeft=ms=>{const m=Math.max(0,Math.ceil(ms/6e4));return m>=60?Math.ceil(m/60)+' ч':m+' мин'};
 const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return m>10&&m<15?c:k===1?a:k>1&&k<5?b:c};
@@ -1650,9 +1658,28 @@ try{document.fonts&&document.fonts.ready.then(()=>{if(!spinning&&slots.length)re
 function applyMe(d){
   const u=d.user;
   S.coins=u.coins;S.spins=u.spins;S.daily=d.daily;S.wheel=d.wheel;S.reset=d.reset;S.inv=d.inv;S.lotsN=d.lots;S.admin=!!u.admin;
+  if(u.subWarn&&!S._sw){S._sw=1;setTimeout(()=>toast('Бот не админ канала: проверка подписки не работает'),800)}
   setCoins(S.coins,true);paintHead();paintGift();renderGarage();paintMCount();paintProfile();
 }
 async function refreshMe(){try{applyMe(await api('GET','/api/me?since='+Date.now()))}catch(e){}}
+const CHANNEL_URL='https://t.me/layerplates';
+function showSub(){hide('#ov-err');show('#ov-sub');const b=$('#sub-ck');b.disabled=false;b.textContent='Я подписался'}
+function openChannel(){try{if(tg&&tg.openTelegramLink){tg.openTelegramLink(CHANNEL_URL);return}}catch(e){}window.open(CHANNEL_URL,'_blank')}
+let subBusy=false;
+async function checkSub(silent){
+  if(subBusy)return;subBusy=true;
+  const b=$('#sub-ck');b.disabled=true;b.textContent='Проверяю…';
+  try{
+    await api('GET','/api/me?since='+Date.now());
+    hide('#ov-sub');hapN('success');boot();
+  }catch(e){
+    if(e.error==='nosub'){if(!silent){toast('Подписка не найдена. Подпишитесь и нажмите ещё раз');hapN('error')}}
+    else if(!silent)errToast(e);
+  }finally{subBusy=false;b.disabled=false;b.textContent='Я подписался'}
+}
+$('#sub-go').onclick=openChannel;
+$('#sub-ck').onclick=()=>checkSub(false);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&$('#ov-sub').classList.contains('on'))setTimeout(()=>checkSub(true),400)});
 function showErr(h,p,retry){
   $('#err-h').textContent=h;$('#err-p').textContent=p||'';
   $('#err-sp').style.display=retry==null?'':'none';
@@ -1671,7 +1698,8 @@ async function boot(){
     if(dayReady())setTimeout(()=>{if(!$('.ov.on:not(#ov-err)'))openRewards('days')},500);
     if(d.sales&&d.sales.n>0){toast(`Продано ${d.sales.n} ${plural(d.sales.n,'номер','номера','номеров')} · +${fmt(d.sales.net)}`);hapN('success')}
   }catch(e){
-    if(e.error==='banned')showErr('Доступ закрыт','Ваш аккаунт заблокирован администратором.');
+    if(e.error==='nosub')showSub();
+    else if(e.error==='banned')showErr('Доступ закрыт','Ваш аккаунт заблокирован администратором.');
     else if(e.error==='auth'||e.error==='expired')showErr('Сессия устарела','Закройте игру и откройте её заново из бота.');
     else showErr(e.error==='net'?'Нет связи с сервером':'Сервер недоступен','Проверьте интернет и повторите.',boot);
   }
