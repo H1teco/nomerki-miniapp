@@ -166,18 +166,33 @@ function rollPlate(country,w){
 }
 
 /* ================= API ================= */
-const COMM=5, LOT_TTL=864e5, MAX_LOTS=10, NPC_TARGET=14, NPC_TTL=216e5, DAY=864e5;
+const COMM=5, LOT_TTL=864e5, MAX_LOTS=10, DAY=864e5;
 const ORIGINS=['https://h1teco.github.io'];
 const DDL=[
- `CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name TEXT,coins INTEGER NOT NULL,spins INTEGER NOT NULL DEFAULT 0,bonus_at INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL)`,
+ `CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name TEXT,coins INTEGER NOT NULL,spins INTEGER NOT NULL DEFAULT 0,bonus_at INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,seen INTEGER NOT NULL DEFAULT 0,banned INTEGER NOT NULL DEFAULT 0)`,
  `CREATE TABLE IF NOT EXISTS plates(id TEXT PRIMARY KEY,owner INTEGER NOT NULL,st TEXT NOT NULL DEFAULT 'own',c TEXT NOT NULL,rar INTEGER NOT NULL,v INTEGER NOT NULL,data TEXT NOT NULL,created INTEGER NOT NULL)`,
  `CREATE INDEX IF NOT EXISTS plates_owner ON plates(owner)`,
  `CREATE TABLE IF NOT EXISTS lots(id TEXT PRIMARY KEY,plate_id TEXT NOT NULL,seller INTEGER NOT NULL,seller_name TEXT,price INTEGER NOT NULL,st TEXT NOT NULL DEFAULT 'active',settled INTEGER NOT NULL DEFAULT 0,buyer INTEGER,buyer_name TEXT,created INTEGER NOT NULL,expires INTEGER NOT NULL,sold_at INTEGER,c TEXT,rar INTEGER,v INTEGER)`,
  `CREATE INDEX IF NOT EXISTS lots_active ON lots(st,c)`,
- `CREATE INDEX IF NOT EXISTS lots_seller ON lots(seller,st)`
+ `CREATE INDEX IF NOT EXISTS lots_seller ON lots(seller,st)`,
+ `CREATE TABLE IF NOT EXISTS issued(k TEXT PRIMARY KEY,ts INTEGER NOT NULL)`
 ];
 let ready=null,lastClean=0;
-const init=env=>ready||(ready=env.DB.batch(DDL.map(s=>env.DB.prepare(s))).catch(e=>{ready=null;throw e}));
+const MIG=['ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0'];
+const init=env=>ready||(ready=(async()=>{
+  await env.DB.batch(DDL.map(s=>env.DB.prepare(s)));
+  for(const m of MIG){try{await env.DB.prepare(m).run()}catch(e){if(!/duplicate column/i.test(String(e&&e.message||e)))throw e}}
+  /* ботов на рынке больше нет */
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM lots WHERE seller=0"),
+    env.DB.prepare("DELETE FROM plates WHERE owner=0")
+  ]);
+  /* реестр уникальных номеров: однажды выданный номер больше не выпадет никому, даже после продажи системе */
+  await env.DB.prepare("INSERT OR IGNORE INTO issued(k,ts) SELECT c||'|'||COALESCE(json_extract(data,'$.d'),'')||'|'||COALESCE(json_extract(data,'$.l'),'')||'|'||COALESCE(json_extract(data,'$.l1'),'')||'|'||COALESCE(json_extract(data,'$.l2'),'')||'|'||COALESCE(json_extract(data,'$.pre'),'')||'|'||COALESCE(json_extract(data,'$.suf'),'')||'|'||COALESCE(json_extract(data,'$.reg'),''),created FROM plates WHERE NOT EXISTS(SELECT 1 FROM issued LIMIT 1)").run();
+})().catch(e=>{ready=null;throw e}));
+/* админы: Telegram ID через запятую (переменная ADMIN_IDS либо значение по умолчанию) */
+const ADMIN_DEFAULT='6329174504';
+const isAdmin=(env,id)=>String(env.ADMIN_IDS||ADMIN_DEFAULT).split(',').map(x=>x.trim()).includes(String(id));
 
 class HttpErr extends Error{constructor(s,code,extra){super(code);this.s=s;this.code=code;this.extra=extra||{}}}
 const cors=(req,env)=>{
@@ -202,10 +217,10 @@ async function auth(req,env){
   return{id:u.id,name:u.username?'@'+u.username:(u.first_name||'Игрок')};
 }
 async function getUser(env,a,now){
-  let u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at FROM users WHERE id=?').bind(a.id).first();
+  let u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at,banned FROM users WHERE id=?').bind(a.id).first();
   if(!u){
     await env.DB.prepare('INSERT OR IGNORE INTO users(id,name,coins,created) VALUES(?,?,?,?)').bind(a.id,a.name,START_COINS,now).run();
-    u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at FROM users WHERE id=?').bind(a.id).first();
+    u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at,banned FROM users WHERE id=?').bind(a.id).first();
   }else if(u.name!==a.name){
     await env.DB.prepare('UPDATE users SET name=? WHERE id=?').bind(a.name,a.id).run();u.name=a.name;
   }
@@ -214,35 +229,97 @@ async function getUser(env,a,now){
 const strip=p=>{const{id,paid,...r}=p;return r};
 const plateOf=r=>({...JSON.parse(r.data),id:r.id,st:r.st});
 const lotPlate=r=>({...JSON.parse(r.data),id:r.plate_id});
-const userOut=u=>({id:u.id,name:u.name,coins:u.coins,spins:u.spins,bonusAt:u.bonus_at});
+const userOut=(u,env)=>({id:u.id,name:u.name,coins:u.coins,spins:u.spins,bonusAt:u.bonus_at,admin:isAdmin(env,u.id)});
 const coinsOf=async(env,id)=>(await env.DB.prepare('SELECT coins FROM users WHERE id=?').bind(id).first()).coins;
 
 async function housekeeping(env,now){
   if(now-lastClean<30000)return;lastClean=now;
   const D=env.DB;
   await D.batch([
-    D.prepare("UPDATE lots SET st='expired' WHERE st='active' AND seller!=0 AND expires<?").bind(now),
+    D.prepare("UPDATE lots SET st='expired' WHERE st='active' AND expires<?").bind(now),
     D.prepare("UPDATE plates SET st='own' WHERE st='listed' AND id IN(SELECT plate_id FROM lots WHERE st='expired' AND settled=0)"),
     D.prepare("UPDATE lots SET settled=1 WHERE st='expired' AND settled=0"),
-    D.prepare("DELETE FROM plates WHERE owner=0 AND st='listed' AND id IN(SELECT plate_id FROM lots WHERE seller=0 AND st='active' AND created<?)").bind(now-NPC_TTL),
-    D.prepare("DELETE FROM lots WHERE seller=0 AND st='active' AND created<?").bind(now-NPC_TTL),
     D.prepare("DELETE FROM lots WHERE st!='active' AND settled=1 AND created<?").bind(now-30*DAY)
   ]);
-  const have=(await D.prepare("SELECT COUNT(*) n FROM lots WHERE seller=0 AND st='active'").first()).n;
-  const need=Math.min(8,NPC_TARGET-have);
-  if(need>0){
-    const st=[];
-    for(let i=0;i<need;i++){
-      const p=rollPlate('ALL',W_MARKET),price=nice(p.v*(.95+Math.random()*.5));
-      st.push(D.prepare("INSERT INTO plates(id,owner,st,c,rar,v,data,created) VALUES(?,0,'listed',?,?,?,?,?)").bind(p.id,p.c,p.rar,p.v,JSON.stringify(strip(p)),now));
-      st.push(D.prepare("INSERT INTO lots(id,plate_id,seller,seller_name,price,created,expires,c,rar,v) VALUES(?,?,0,'Рынок',?,?,?,?,?,?)").bind(uid(),p.id,price,now,now+NPC_TTL*2,p.c,p.rar,p.v));
+}
+/* уникальный номер: ключ резервируется в реестре навсегда; при нехватке свободных комбинаций качество понижается */
+const plateKey=p=>[p.c,p.d,p.l||'',p.l1||'',p.l2||'',p.pre||'',p.suf||'',p.reg||''].join('|');
+async function claimPlate(env,c,g,now){
+  for(let gg=g;gg>=0;gg--){
+    for(let round=0;round<3;round++){
+      const cands=Array.from({length:12},()=>makePlate(c,gg)),keys=cands.map(plateKey);
+      const taken=new Set((await env.DB.prepare(`SELECT k FROM issued WHERE k IN(${keys.map(()=>'?').join(',')})`).bind(...keys).all()).results.map(r=>r.k));
+      for(let i=0;i<cands.length;i++){
+        if(taken.has(keys[i]))continue;
+        const r=await env.DB.prepare('INSERT OR IGNORE INTO issued(k,ts) VALUES(?,?)').bind(keys[i],now).run();
+        if(r.meta.changes===1)return cands[i];
+        taken.add(keys[i]);
+      }
     }
-    await D.batch(st);
   }
+  throw new HttpErr(503,'exhausted');
 }
 const int=(x,lo,hi)=>{x=Math.floor(+x);if(!Number.isFinite(x)||x<lo||x>hi)throw new HttpErr(400,'bad');return x};
 
+const needAdmin=(env,u)=>{if(!isAdmin(env,u.id))throw new HttpErr(403,'forbidden')};
 const routes={
+
+  /* ---------- админка ---------- */
+  async 'GET /api/admin/stats'(env,u,url,now){
+    needAdmin(env,u);
+    const q=async(sql,...b)=>(await env.DB.prepare(sql).bind(...b).first());
+    const[pl,on,coins,plates,lots,sold,spins]=await Promise.all([
+      q('SELECT COUNT(*) n FROM users'),
+      q('SELECT COUNT(*) n FROM users WHERE seen>?',now-DAY),
+      q('SELECT COALESCE(SUM(coins),0) n FROM users'),
+      q("SELECT COUNT(*) n,COALESCE(SUM(v),0) s FROM plates"),
+      q("SELECT COUNT(*) n FROM lots WHERE st='active' "),
+      q("SELECT COUNT(*) n,COALESCE(SUM(price),0) s FROM lots WHERE st='sold'"),
+      q('SELECT COALESCE(SUM(spins),0) n FROM users')
+    ]);
+    const hist=(await env.DB.prepare('SELECT COUNT(*) n FROM users WHERE created>?').bind(now-DAY).first()).n;
+    return{players:pl.n,online24:on.n,new24:hist,coins:coins.n,plates:plates.n,platesValue:plates.s,lots:lots.n,sales:sold.n,salesVolume:sold.s,commission:Math.floor(sold.s*COMM/100),spins:spins.n};
+  },
+  async 'GET /api/admin/users'(env,u,url,now){
+    needAdmin(env,u);
+    const qq=(url.searchParams.get('q')||'').trim().slice(0,40),like='%'+qq.replace(/[%_]/g,'')+'%';
+    const rows=(await env.DB.prepare("SELECT u.id,u.name,u.coins,u.spins,u.seen,u.banned,u.created,(SELECT COUNT(*) FROM plates p WHERE p.owner=u.id) pc FROM users u WHERE (?='' OR u.name LIKE ? OR CAST(u.id AS TEXT)=?) ORDER BY u.seen DESC LIMIT 40").bind(qq,like,qq).all()).results;
+    return{users:rows.map(r=>({id:r.id,name:r.name,coins:r.coins,spins:r.spins,seen:r.seen,banned:!!r.banned,created:r.created,plates:r.pc}))};
+  },
+  async 'POST /api/admin/grant'(env,u,url,now,b){
+    needAdmin(env,u);
+    const id=int(b.id,1,1e15),amt=int(b.amount,-1e9,1e9);
+    const t=await env.DB.prepare('SELECT coins FROM users WHERE id=?').bind(id).first();
+    if(!t)throw new HttpErr(404,'nouser');
+    await env.DB.prepare('UPDATE users SET coins=MAX(0,coins+?) WHERE id=?').bind(amt,id).run();
+    return{coins:await coinsOf(env,id)};
+  },
+  async 'POST /api/admin/ban'(env,u,url,now,b){
+    needAdmin(env,u);
+    const id=int(b.id,1,1e15);
+    if(isAdmin(env,id))throw new HttpErr(400,'bad');
+    const r=await env.DB.prepare('UPDATE users SET banned=? WHERE id=?').bind(b.banned?1:0,id).run();
+    if(r.meta.changes!==1)throw new HttpErr(404,'nouser');
+    return{banned:!!b.banned};
+  },
+  async 'GET /api/admin/lots'(env,u,url,now){
+    needAdmin(env,u);
+    const rows=(await env.DB.prepare("SELECT l.id,l.price,l.seller,l.seller_name,l.expires,l.v,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.st='active' ORDER BY l.created DESC LIMIT 60").all()).results;
+    return{lots:rows.map(r=>({id:r.id,price:r.price,seller:r.seller_name,sellerId:r.seller,expires:r.expires,plate:{...JSON.parse(r.data),id:r.pid}}))};
+  },
+  async 'POST /api/admin/cancel'(env,u,url,now,b){
+    needAdmin(env,u);
+    const id=String(b.lotId||'');
+    const lot=await env.DB.prepare("SELECT plate_id,seller,st FROM lots WHERE id=?").bind(id).first();
+    if(!lot||lot.st!=='active')throw new HttpErr(410,'gone');
+    const res=await env.DB.batch([
+      env.DB.prepare("UPDATE lots SET st='cancelled',settled=0 WHERE id=? AND st='active'").bind(id),
+      env.DB.prepare("UPDATE plates SET st='own' WHERE id=(SELECT plate_id FROM lots WHERE id=?) AND EXISTS(SELECT 1 FROM lots WHERE id=? AND st='cancelled' AND settled=0)").bind(id,id),
+      env.DB.prepare("UPDATE lots SET settled=1 WHERE id=? AND st='cancelled' AND settled=0").bind(id)
+    ]);
+    if(res[0].meta.changes!==1)throw new HttpErr(410,'gone');
+    return{ok:true};
+  },
   async 'GET /api/me'(env,u,url,now){
     await housekeeping(env,now);
     const sq=url.searchParams.get('since'),since=sq===null?now:+sq||0;
@@ -251,13 +328,14 @@ const routes={
       env.DB.prepare("SELECT COUNT(*) n FROM lots WHERE seller=? AND st='active'").bind(u.id).first(),
       env.DB.prepare(`SELECT COUNT(*) n,COALESCE(SUM(price*${100-COMM}/100),0) net FROM lots WHERE seller=? AND st='sold' AND sold_at>?`).bind(u.id,since).first()
     ]);
-    return{user:userOut(u),inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},now};
+    await env.DB.prepare('UPDATE users SET seen=? WHERE id=?').bind(now,u.id).run();
+    return{user:userOut(u,env),inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},now};
   },
   async 'POST /api/spin'(env,u,url,now,b){
     const c=String(b.c);if(!C[c])throw new HttpErr(400,'bad');
     const T=TIERS[int(b.tier,0,TIERS.length-1)],n=int(b.n,1,5),cost=T.price*n;
     if(u.coins<cost)throw new HttpErr(402,'coins');
-    const plates=Array.from({length:n},()=>makePlate(c,wpick(T.w)));
+    const plates=[];for(let i=0;i<n;i++)plates.push(await claimPlate(env,c,wpick(T.w),now));
     const st=plates.map(p=>env.DB.prepare("INSERT INTO plates(id,owner,st,c,rar,v,data,created) SELECT ?,?,'own',?,?,?,?,? WHERE (SELECT coins FROM users WHERE id=?)>=?").bind(p.id,u.id,p.c,p.rar,p.v,JSON.stringify(strip(p)),now,u.id,cost));
     st.push(env.DB.prepare('UPDATE users SET coins=coins-?,spins=spins+? WHERE id=? AND coins>=?').bind(cost,n,u.id,cost));
     const res=await env.DB.batch(st);
@@ -288,8 +366,8 @@ const routes={
   async 'GET /api/market'(env,u,url,now){
     await housekeeping(env,now);
     const c=url.searchParams.get('c')||'ALL';
-    const rows=(await env.DB.prepare("SELECT l.id,l.price,l.seller,l.seller_name,l.expires,l.v,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.st='active' AND l.seller!=? AND (?='ALL' OR l.c=?) AND (l.seller=0 OR l.expires>?) ORDER BY l.rar DESC,l.price*1.0/l.v ASC LIMIT 60").bind(u.id,c,c,now).all()).results;
-    return{lots:rows.map(r=>({id:r.id,price:r.price,seller:r.seller_name,npc:r.seller===0,expires:r.expires,plate:{...JSON.parse(r.data),id:r.pid}})),now};
+    const rows=(await env.DB.prepare("SELECT l.id,l.price,l.seller,l.seller_name,l.expires,l.v,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.st='active' AND l.seller!=? AND (?='ALL' OR l.c=?) AND l.expires>? ORDER BY l.rar DESC,l.price*1.0/l.v ASC LIMIT 60").bind(u.id,c,c,now).all()).results;
+    return{lots:rows.map(r=>({id:r.id,price:r.price,seller:r.seller_name,expires:r.expires,plate:{...JSON.parse(r.data),id:r.pid}})),now};
   },
   async 'GET /api/lots'(env,u,url,now){
     await housekeeping(env,now);
@@ -316,12 +394,12 @@ const routes={
   async 'POST /api/buy'(env,u,url,now,b){
     const id=String(b.lotId||'');
     const lot=await env.DB.prepare("SELECT id,plate_id,seller,price,st,expires FROM lots WHERE id=?").bind(id).first();
-    if(!lot||lot.st!=='active'||(lot.seller!==0&&lot.expires<now))throw new HttpErr(410,'gone');
+    if(!lot||lot.st!=='active'||lot.expires<now)throw new HttpErr(410,'gone');
     if(lot.seller===u.id)throw new HttpErr(400,'own');
     if(u.coins<lot.price)throw new HttpErr(402,'coins');
     const ok="EXISTS(SELECT 1 FROM lots WHERE id=? AND st='sold' AND buyer=? AND settled=0)";
     const res=await env.DB.batch([
-      env.DB.prepare("UPDATE lots SET st='sold',buyer=?,buyer_name=?,sold_at=?,settled=0 WHERE id=? AND st='active' AND seller!=? AND (seller=0 OR expires>?) AND (SELECT coins FROM users WHERE id=?)>=price").bind(u.id,u.name,now,id,u.id,now,u.id),
+      env.DB.prepare("UPDATE lots SET st='sold',buyer=?,buyer_name=?,sold_at=?,settled=0 WHERE id=? AND st='active' AND seller!=? AND expires>? AND (SELECT coins FROM users WHERE id=?)>=price").bind(u.id,u.name,now,id,u.id,now,u.id),
       env.DB.prepare(`UPDATE users SET coins=coins-(SELECT price FROM lots WHERE id=?) WHERE id=? AND ${ok}`).bind(id,u.id,id,u.id),
       env.DB.prepare(`UPDATE users SET coins=coins+(SELECT price*${100-COMM}/100 FROM lots WHERE id=?) WHERE id=(SELECT seller FROM lots WHERE id=?) AND ${ok}`).bind(id,id,id,u.id),
       env.DB.prepare(`UPDATE plates SET owner=?,st='own' WHERE id=(SELECT plate_id FROM lots WHERE id=?) AND ${ok}`).bind(u.id,id,id,u.id),
@@ -359,6 +437,7 @@ export default{
       await init(env);
       const a=await auth(req,env),now=Date.now();
       const u=await getUser(env,a,now);
+      if(u.banned&&!isAdmin(env,u.id))throw new HttpErr(403,'banned');
       let body={};
       if(req.method==='POST'){try{const t=await req.text();body=t?JSON.parse(t):{}}catch(e){throw new HttpErr(400,'bad')}}
       return out(await fn(env,u,url,now,body));
