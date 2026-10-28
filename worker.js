@@ -251,10 +251,16 @@ const DDL=[
  `CREATE INDEX IF NOT EXISTS plates_created ON plates(created)`,
  `CREATE TABLE IF NOT EXISTS alog(id INTEGER PRIMARY KEY AUTOINCREMENT,ts INTEGER NOT NULL,admin INTEGER NOT NULL,act TEXT NOT NULL,target INTEGER NOT NULL DEFAULT 0,info TEXT)`,
  `CREATE INDEX IF NOT EXISTS alog_target ON alog(target,ts)`,
+ `CREATE TABLE IF NOT EXISTS quest(user INTEGER NOT NULL,day INTEGER NOT NULL,q TEXT NOT NULL,ev TEXT NOT NULL,g INTEGER NOT NULL,r INTEGER NOT NULL,p INTEGER NOT NULL DEFAULT 0,claimed INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user,day,q))`,
+ `CREATE TABLE IF NOT EXISTS lotto(day INTEGER NOT NULL,user INTEGER NOT NULL,n INTEGER NOT NULL,PRIMARY KEY(day,user))`,
+ `CREATE TABLE IF NOT EXISTS lotto_res(day INTEGER PRIMARY KEY,winner INTEGER NOT NULL,prize INTEGER NOT NULL,pool INTEGER NOT NULL,tickets INTEGER NOT NULL,players INTEGER NOT NULL,ts INTEGER NOT NULL)`,
+ `CREATE TABLE IF NOT EXISTS resv(k TEXT PRIMARY KEY,oid TEXT NOT NULL,until INTEGER NOT NULL)`,
+ `CREATE TABLE IF NOT EXISTS orders(id TEXT PRIMARY KEY,user INTEGER NOT NULL,k TEXT NOT NULL,pid TEXT NOT NULL,data TEXT NOT NULL,stars INTEGER NOT NULL,st TEXT NOT NULL DEFAULT 'new',charge TEXT,created INTEGER NOT NULL,paid_at INTEGER)`,
+ `CREATE INDEX IF NOT EXISTS orders_user ON orders(user,st)`,
  `CREATE TABLE IF NOT EXISTS walert(id INTEGER PRIMARY KEY AUTOINCREMENT,ts INTEGER NOT NULL,user INTEGER NOT NULL,delta INTEGER NOT NULL,w_from INTEGER NOT NULL,w_to INTEGER NOT NULL,dt INTEGER NOT NULL,seen INTEGER NOT NULL DEFAULT 0)`
 ];
 let ready=null,lastClean=0;
-const MIG=['ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN streak INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN last_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wheel_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN notify INTEGER NOT NULL DEFAULT 1','ALTER TABLE users ADD COLUMN remind_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN dname TEXT','ALTER TABLE users ADD COLUMN photo TEXT','ALTER TABLE users ADD COLUMN avatar TEXT','ALTER TABLE users ADD COLUMN av INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN name_at INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN uname TEXT','ALTER TABLE users ADD COLUMN note TEXT','ALTER TABLE users ADD COLUMN mute INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN ban_reason TEXT','ALTER TABLE users ADD COLUMN csnap INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wsnap INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wsnap_at INTEGER NOT NULL DEFAULT 0','ALTER TABLE refs ADD COLUMN hold INTEGER NOT NULL DEFAULT 0','ALTER TABLE promos ADD COLUMN plate_rar INTEGER NOT NULL DEFAULT -1','ALTER TABLE promos ADD COLUMN plate_c TEXT'];
+const MIG=['ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN streak INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN last_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wheel_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN notify INTEGER NOT NULL DEFAULT 1','ALTER TABLE users ADD COLUMN remind_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN dname TEXT','ALTER TABLE users ADD COLUMN photo TEXT','ALTER TABLE users ADD COLUMN avatar TEXT','ALTER TABLE users ADD COLUMN av INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN name_at INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN uname TEXT','ALTER TABLE users ADD COLUMN note TEXT','ALTER TABLE users ADD COLUMN mute INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN ban_reason TEXT','ALTER TABLE users ADD COLUMN csnap INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wsnap INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wsnap_at INTEGER NOT NULL DEFAULT 0','ALTER TABLE refs ADD COLUMN hold INTEGER NOT NULL DEFAULT 0','ALTER TABLE promos ADD COLUMN plate_rar INTEGER NOT NULL DEFAULT -1','ALTER TABLE promos ADD COLUMN plate_c TEXT','ALTER TABLE users ADD COLUMN pity TEXT'];
 /* одноразовая переоценка старых номеров по новой схеме (множители цифр × букв × региона) */
 function revalue(p){
   const c=p.c;if(!C[c]||!p.d)return null;
@@ -327,7 +333,7 @@ async function auth(req,env){
   return{id:u.id,name:nm,photo:ph,un};
 }
 async function getUser(env,a,now){
-  const SEL='SELECT id,name,coins,spins,bonus_at,banned,ban_reason,streak,last_day,wheel_day,dname,photo,av,name_at,uname,mute FROM users WHERE id=?';
+  const SEL='SELECT id,name,coins,spins,bonus_at,banned,ban_reason,streak,last_day,wheel_day,dname,photo,av,name_at,uname,mute,pity FROM users WHERE id=?';
   let u=await env.DB.prepare(SEL).bind(a.id).first();
   if(!u){
     await env.DB.prepare('INSERT OR IGNORE INTO users(id,name,coins,created,photo,uname) VALUES(?,?,?,?,?,?)').bind(a.id,a.name,START_COINS,now,a.photo,a.un).run();
@@ -499,6 +505,8 @@ async function housekeeping(env,now){
   ]);
   try{await weeklyPrizes(env,now)}catch(e){console.log('weekly',e&&e.message)}
   await settleAuctions(env,now);
+  try{await settleLotto(env,now)}catch(e){console.log('lotto',e&&e.message)}
+  try{await env.DB.prepare('DELETE FROM quest WHERE day<?').bind(dayNum(now)-3).run()}catch(e){}
   try{await wealthSweep(env,now)}catch(e){console.log('sweep',e&&e.message)}
 }
 /* уникальный номер: ключ резервируется в реестре навсегда; при нехватке свободных комбинаций качество понижается */
@@ -674,8 +682,217 @@ async function wealthSweep(env,now){
   }
 }
 
+
+/* ---------- гарантия, задания, лотерея, номера за Stars ---------- */
+const PITY=[50,50,50,50,80];
+const pityOf=u=>{try{const o=JSON.parse(u.pity||'{}');return o&&typeof o==='object'?o:{}}catch(e){return{}}};
+const QPOOL=[
+ {id:'spin5',ev:'spin',g:5,r:1500,t:'Покрутить 5 номеров'},
+ {id:'spin12',ev:'spin',g:12,r:3000,t:'Покрутить 12 номеров'},
+ {id:'sell2',ev:'sell',g:2,r:1500,t:'Сдать 2 номера за монеты'},
+ {id:'list1',ev:'list',g:1,r:1500,t:'Выставить номер на рынок'},
+ {id:'buy1',ev:'buy',g:1,r:2500,t:'Купить номер на рынке'},
+ {id:'bid1',ev:'bid',g:1,r:2000,t:'Сделать ставку на аукционе'},
+ {id:'rare1',ev:'rare',g:1,r:3000,t:'Выбить номер «Редкий» или выше'},
+ {id:'daily',ev:'daily',g:1,r:800,t:'Забрать ежедневную награду'},
+ {id:'wheel',ev:'wheel',g:1,r:800,t:'Крутануть колесо удачи'},
+ {id:'ticket',ev:'ticket',g:2,r:1500,t:'Купить 2 билета лотереи'}
+];
+const QBONUS=3000;
+const qseed=(uid_,day)=>{let a=(uid_*2654435761+day*40503)>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}};
+const qPick=(uid_,day)=>{const rnd_=qseed(uid_,day),pool=[...QPOOL],out=[];
+  while(out.length<3&&pool.length){const i=Math.floor(rnd_()*pool.length),q=pool.splice(i,1)[0];if(q.ev==='spin'&&out.some(x=>x.ev==='spin'))continue;out.push(q)}
+  return out};
+const qSeen=new Map();
+async function qEnsure(env,uid_,day){
+  if(qSeen.get(uid_)===day)return;
+  const have=(await env.DB.prepare('SELECT COUNT(*) n FROM quest WHERE user=? AND day=?').bind(uid_,day).first()).n;
+  if(!have){
+    const qs=qPick(uid_,day);
+    await env.DB.batch([...qs.map(q=>env.DB.prepare('INSERT OR IGNORE INTO quest(user,day,q,ev,g,r) VALUES(?,?,?,?,?,?)').bind(uid_,day,q.id,q.ev,q.g,q.r)),
+      env.DB.prepare("INSERT OR IGNORE INTO quest(user,day,q,ev,g,r) VALUES(?,?,'bonus','all',3,?)").bind(uid_,day,QBONUS)]);
+  }
+  if(qSeen.size>5000)qSeen.clear();
+  qSeen.set(uid_,day);
+}
+async function qProg(env,uid_,ev,n,now){
+  if(!(n>0))return;
+  try{const day=dayNum(now);await qEnsure(env,uid_,day);
+    await env.DB.prepare('UPDATE quest SET p=MIN(g,p+?) WHERE user=? AND day=? AND ev=? AND claimed=0').bind(n,uid_,day,ev).run()}
+  catch(e){console.log('quest',e&&e.message)}
+}
+async function qList(env,uid_,now){
+  const day=dayNum(now);await qEnsure(env,uid_,day);
+  const rows=(await env.DB.prepare('SELECT q,ev,g,r,p,claimed FROM quest WHERE user=? AND day=?').bind(uid_,day).all()).results;
+  const items=rows.filter(x=>x.q!=='bonus').map(x=>{const d=QPOOL.find(y=>y.id===x.q)||{t:x.q};return{id:x.q,t:d.t,g:x.g,p:x.p,r:x.r,state:x.claimed?'done':x.p>=x.g?'ready':'go'}});
+  const b=rows.find(x=>x.q==='bonus'),done=items.filter(x=>x.state==='done').length;
+  return{items,bonus:{r:b?b.r:QBONUS,p:done,g:3,state:b&&b.claimed?'done':done>=3?'ready':'go'},reset:dayEnd(now),ready:items.filter(x=>x.state==='ready').length+(b&&!b.claimed&&done>=3?1:0)};
+}
+/* лотерея дня */
+const LOTTO_PRICE=500,LOTTO_MAX=20,LOTTO_FEE=10;
+async function settleLotto(env,now){
+  const day=dayNum(now);
+  const days=(await env.DB.prepare('SELECT DISTINCT day FROM lotto WHERE day<? AND day NOT IN(SELECT day FROM lotto_res) ORDER BY day LIMIT 5').bind(day).all()).results;
+  for(const{day:d}of days){
+    const rows=(await env.DB.prepare('SELECT user,n FROM lotto WHERE day=? ORDER BY user').bind(d).all()).results;
+    const tot=rows.reduce((a,x)=>a+x.n,0),pool=tot*LOTTO_PRICE;
+    if(rows.length<2){
+      const st=[env.DB.prepare('INSERT OR IGNORE INTO lotto_res(day,winner,prize,pool,tickets,players,ts) VALUES(?,?,?,?,?,?,?)').bind(d,0,0,pool,tot,rows.length,now)];
+      for(const r of rows)st.push(env.DB.prepare('UPDATE users SET coins=coins+? WHERE id=? AND EXISTS(SELECT 1 FROM lotto_res WHERE day=? AND ts=?)').bind(r.n*LOTTO_PRICE,r.user,d,now));
+      const res=await env.DB.batch(st);
+      if(res[0].meta.changes===1)for(const r of rows)bg(notify(env,r.user,`🎟 В лотерее было мало участников, розыгрыш не состоялся. Ваши ${fmtN(r.n*LOTTO_PRICE)} монет возвращены.`));
+      continue;
+    }
+    let x=Math.floor(Math.random()*tot),w=rows[rows.length-1];
+    for(const r of rows){if(x<r.n){w=r;break}x-=r.n}
+    const prize=Math.floor(pool*(100-LOTTO_FEE)/100);
+    const res=await env.DB.batch([
+      env.DB.prepare('INSERT OR IGNORE INTO lotto_res(day,winner,prize,pool,tickets,players,ts) VALUES(?,?,?,?,?,?,?)').bind(d,w.user,prize,pool,tot,rows.length,now),
+      env.DB.prepare('UPDATE users SET coins=coins+? WHERE id=? AND (SELECT changes())=1').bind(prize,w.user)
+    ]);
+    if(res[0].meta.changes===1){
+      bg(notify(env,w.user,`🎟 <b>Вы выиграли в лотерее!</b> Приз: <b>+${fmtN(prize)}</b> монет (билетов у вас: ${w.n}).`));
+      for(const r of rows)if(r.user!==w.user)bg(notify(env,r.user,`🎟 Лотерея дня разыграна, в этот раз не повезло. Выиграл банк ${fmtN(prize)} монет другой игрок. Завтра новая попытка!`));
+    }
+  }
+  await env.DB.prepare('DELETE FROM lotto WHERE day<?').bind(day-30).run();
+}
+/* номера на заказ за Telegram Stars */
+const STAR_DIV=20,STAR_MIN=50,STAR_MAX=10000,RESV_TTL=15*60e3;
+const starsOf=v=>Math.max(STAR_MIN,Math.round(v/STAR_DIV/10)*10);
+const TERMS=()=>`📄 <b>Условия покупки номеров на заказ</b>
+
+1. За ⭐ Telegram Stars вы покупаете цифровой товар: уникальный номер в игре «Гараж номеров». Номер нельзя сдать системе за монеты, но можно продать или обменять на рынке и аукционе.
+2. Цена зависит от качества и комбинации номера и показывается до оплаты. Номер выдаётся в гараж сразу после оплаты.
+3. Если номер оказался занят в момент оплаты, платёж возвращается автоматически.
+4. Возврат по другим причинам возможен, пока номер не продан другому игроку: напишите /paysupport.
+5. Покупая, вы подтверждаете, что прочитали эти условия.`;
+const PAYSUPPORT=()=>`🛟 <b>Поддержка платежей</b>
+
+Проблема с оплатой или номером? Напишите администратору: ${SUPPORT_HANDLE}. Укажите, что купили и во сколько. Помощь Telegram и поддержка Telegram по покупкам в этом боте не помогает: платежи решает только администратор игры.`;
+const SUPPORT_HANDLE='@LayerStudio';
+async function starsFulfil(env,from,sp,now){
+  const o=await env.DB.prepare('SELECT id,user,k,pid,data,stars,st FROM orders WHERE id=?').bind(String(sp.invoice_payload||'')).first();
+  const charge=String(sp.telegram_payment_charge_id||'');
+  if(!o||o.user!==from||o.stars!==sp.total_amount||sp.currency!=='XTR'){
+    console.log('stars: unknown payment',from,JSON.stringify(sp));
+    if(charge&&from){const r=await tgCall(env,'refundStarPayment',{user_id:from,telegram_payment_charge_id:charge});console.log('stars refund unknown',JSON.stringify(r))}
+    return;
+  }
+  if(o.st==='paid'||o.st==='refunded')return;
+  const p=JSON.parse(o.data);
+  const res=await env.DB.batch([
+    env.DB.prepare('INSERT OR IGNORE INTO issued(k,ts) VALUES(?,?)').bind(o.k,now),
+    env.DB.prepare("INSERT INTO plates(id,owner,st,c,rar,v,data,created) SELECT ?,?,'own',?,?,?,?,? WHERE (SELECT changes())=1").bind(o.pid,o.user,p.c,p.rar,p.v,JSON.stringify(strip(p)),now),
+    env.DB.prepare("UPDATE orders SET st='paid',charge=?,paid_at=? WHERE id=? AND st IN('new','cancelled') AND EXISTS(SELECT 1 FROM plates WHERE id=? AND owner=?)").bind(charge,now,o.id,o.pid,o.user),
+    env.DB.prepare('DELETE FROM resv WHERE oid=?').bind(o.id)
+  ]);
+  if(res[2].meta.changes!==1){
+    const r=await tgCall(env,'refundStarPayment',{user_id:o.user,telegram_payment_charge_id:charge});
+    await env.DB.prepare("UPDATE orders SET st='refunded',charge=?,paid_at=? WHERE id=?").bind(charge,now,o.id).run();
+    bg(notify(env,o.user,r&&r.ok?'⭐ Этот номер успел занять другой игрок. Звёзды возвращены.':'⭐ Этот номер уже занят. Напишите /paysupport, мы вернём звёзды.'));
+    return;
+  }
+  bg(notify(env,o.user,`⭐ Оплата прошла. Номер <b>${esc(plateText(p))}</b> уже в вашем гараже.`));
+  bg(achSync(env,{id:o.user},now));
+}
+async function starsPreCheckout(env,q,now){
+  const bad=m=>tgCall(env,'answerPreCheckoutQuery',{pre_checkout_query_id:q.id,ok:false,error_message:m});
+  try{
+    const o=await env.DB.prepare('SELECT id,user,k,stars,st FROM orders WHERE id=?').bind(String(q.invoice_payload||'')).first();
+    if(!o||o.user!==(q.from&&q.from.id)||o.stars!==q.total_amount||q.currency!=='XTR')return bad('Заказ не найден. Откройте покупку в игре заново.');
+    if(o.st==='paid')return bad('Этот заказ уже оплачен.');
+    if(o.st==='refunded')return bad('Заказ отменён.');
+    const taken=await env.DB.prepare('SELECT 1 x FROM issued WHERE k=?').bind(o.k).first();
+    if(taken)return bad('Этот номер уже занят. Выберите другой.');
+    const r=await env.DB.prepare('INSERT INTO resv(k,oid,until) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET until=excluded.until WHERE resv.oid=excluded.oid OR resv.until<?').bind(o.k,o.id,now+RESV_TTL,now).run();
+    if(r.meta.changes!==1)return bad('Этот номер сейчас оплачивает другой игрок.');
+    await env.DB.prepare("UPDATE resv SET oid=? WHERE k=?").bind(o.id,o.k).run();
+    return tgCall(env,'answerPreCheckoutQuery',{pre_checkout_query_id:q.id,ok:true});
+  }catch(e){console.log('precheckout',e&&e.message);return bad('Сервис временно недоступен. Попробуйте ещё раз.')}
+}
+
 const needAdmin=(env,u)=>{if(!isAdmin(env,u.id))throw new HttpErr(403,'forbidden')};
 const routes={
+
+
+  /* ----- задания ----- */
+  async 'GET /api/quests'(env,u,url,now){return await qList(env,u.id,now)},
+  async 'POST /api/quest/claim'(env,u,url,now,b){
+    const id=String(b.id||''),day=dayNum(now);
+    await qEnsure(env,u.id,day);
+    const row=await env.DB.prepare('SELECT q,g,r,p,claimed FROM quest WHERE user=? AND day=? AND q=?').bind(u.id,day,id).first();
+    if(!row)throw new HttpErr(400,'bad');
+    let first;
+    if(id==='bonus')first=env.DB.prepare("UPDATE quest SET claimed=1 WHERE user=? AND day=? AND q='bonus' AND claimed=0 AND (SELECT COUNT(*) FROM quest WHERE user=? AND day=? AND q!='bonus' AND claimed=1)=3").bind(u.id,day,u.id,day);
+    else first=env.DB.prepare('UPDATE quest SET claimed=1 WHERE user=? AND day=? AND q=? AND claimed=0 AND p>=g').bind(u.id,day,id);
+    const res=await env.DB.batch([first,env.DB.prepare('UPDATE users SET coins=coins+? WHERE id=? AND (SELECT changes())=1').bind(row.r,u.id)]);
+    if(res[0].meta.changes!==1)throw new HttpErr(409,row.claimed?'gone':'wait');
+    return{coins:await coinsOf(env,u.id),gained:row.r,quests:await qList(env,u.id,now)};
+  },
+  /* ----- лотерея дня ----- */
+  async 'GET /api/lotto'(env,u,url,now){
+    await settleLotto(env,now);
+    const day=dayNum(now),D=env.DB;
+    const[tot,mine,last]=await Promise.all([
+      D.prepare('SELECT COALESCE(SUM(n),0) t,COUNT(*) p FROM lotto WHERE day=?').bind(day).first(),
+      D.prepare('SELECT n FROM lotto WHERE day=? AND user=?').bind(day,u.id).first(),
+      D.prepare(`SELECT r.day,r.winner,r.prize,r.pool,r.tickets,r.players,${NAME_SQL('w')} wname FROM lotto_res r LEFT JOIN users w ON w.id=r.winner ORDER BY r.day DESC LIMIT 1`).first()
+    ]);
+    return{price:LOTTO_PRICE,max:LOTTO_MAX,fee:LOTTO_FEE,reset:dayEnd(now),tickets:tot.t,players:tot.p,pool:tot.t*LOTTO_PRICE,prize:Math.floor(tot.t*LOTTO_PRICE*(100-LOTTO_FEE)/100),mine:mine?mine.n:0,
+      last:last?{day:last.day,winner:last.winner?{id:last.winner,name:last.wname||'Игрок'}:null,prize:last.prize,pool:last.pool,tickets:last.tickets,players:last.players,mine:last.winner===u.id}:null};
+  },
+  async 'POST /api/lotto/buy'(env,u,url,now,b){
+    const n=int(b.n,1,LOTTO_MAX),day=dayNum(now),cost=n*LOTTO_PRICE;
+    const res=await env.DB.batch([
+      env.DB.prepare('UPDATE users SET coins=coins-? WHERE id=? AND coins>=? AND COALESCE((SELECT n FROM lotto WHERE day=? AND user=?),0)+?<=?').bind(cost,u.id,cost,day,u.id,n,LOTTO_MAX),
+      env.DB.prepare('INSERT INTO lotto(day,user,n) SELECT ?,?,? WHERE (SELECT changes())=1 ON CONFLICT(day,user) DO UPDATE SET n=n+excluded.n').bind(day,u.id,n)
+    ]);
+    if(res[0].meta.changes!==1){
+      const m=await env.DB.prepare('SELECT n FROM lotto WHERE day=? AND user=?').bind(day,u.id).first();
+      throw new HttpErr(409,(m?m.n:0)+n>LOTTO_MAX?'lmax':'coins');
+    }
+    await qProg(env,u.id,'ticket',n,now);
+    return{coins:await coinsOf(env,u.id),gained:0,state:await routes['GET /api/lotto'](env,u,url,now)};
+  },
+  /* ----- номер на заказ за Telegram Stars ----- */
+  async 'POST /api/custom/preview'(env,u,url,now,b){
+    const{p,warn}=customPlate(String(b.c),b.d,b.l,b.reg);
+    const stars=starsOf(p.v),owner=await plateOwnerByKey(env,p);
+    const issued=await env.DB.prepare('SELECT 1 x FROM issued WHERE k=?').bind(plateKey(p)).first();
+    const rv=await env.DB.prepare('SELECT oid,until FROM resv WHERE k=?').bind(plateKey(p)).first();
+    const busy=!!(rv&&rv.until>now);
+    const{id,...pl}=p;
+    return{plate:{...pl,id:'preview'},text:plateText(p),stars,taken:!!(owner||issued),busy,blocked:!!warn,toobig:stars>STAR_MAX,max:STAR_MAX};
+  },
+  async 'POST /api/custom/invoice'(env,u,url,now,b){
+    const{p,warn}=customPlate(String(b.c),b.d,b.l,b.reg);
+    if(warn)throw new HttpErr(409,'blocked');
+    const stars=starsOf(p.v);if(stars>STAR_MAX)throw new HttpErr(409,'toobig',{max:STAR_MAX});
+    const key=plateKey(p);
+    if(await env.DB.prepare('SELECT 1 x FROM issued WHERE k=?').bind(key).first()||await plateOwnerByKey(env,p))throw new HttpErr(409,'taken');
+    const pend=(await env.DB.prepare("SELECT COUNT(*) n FROM orders WHERE user=? AND st='new' AND created>?").bind(u.id,now-36e5).first()).n;
+    if(pend>=10)throw new HttpErr(429,'slow');
+    const oid=uid();
+    const r=await env.DB.prepare('INSERT INTO resv(k,oid,until) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET oid=excluded.oid,until=excluded.until WHERE resv.until<? OR resv.oid IN(SELECT id FROM orders WHERE user=? AND st=\'new\')').bind(key,oid,now+RESV_TTL,now,u.id).run();
+    if(r.meta.changes!==1)throw new HttpErr(409,'busy');
+    p.star=1;p.tags=[...(p.tags||[]),'Номер на заказ'];
+    await env.DB.prepare("UPDATE orders SET st='cancelled' WHERE user=? AND st='new' AND k!=?").bind(u.id,key).run();
+    await env.DB.prepare("INSERT INTO orders(id,user,k,pid,data,stars,created) VALUES(?,?,?,?,?,?,?)").bind(oid,u.id,key,p.id,JSON.stringify(p),stars,now).run();
+    const text=plateText(p);
+    const inv=await tgCall(env,'createInvoiceLink',{title:`Номер ${text}`.slice(0,32),description:`Эксклюзивный номер ${text} (${C[p.c].name}). Попадёт в ваш гараж сразу после оплаты. Оценка ${p.v} монет.`.slice(0,255),payload:oid,provider_token:'',currency:'XTR',prices:[{label:'Номер',amount:stars}]});
+    if(!inv||!inv.ok||typeof inv.result!=='string'){
+      console.log('invoice fail',JSON.stringify(inv));
+      await env.DB.batch([env.DB.prepare('DELETE FROM resv WHERE oid=?').bind(oid),env.DB.prepare("UPDATE orders SET st='failed' WHERE id=?").bind(oid)]);
+      throw new HttpErr(502,'invoice');
+    }
+    return{url:inv.result,order:oid,stars,until:now+RESV_TTL,text};
+  },
+  async 'GET /api/custom/order'(env,u,url,now){
+    const o=await env.DB.prepare('SELECT id,st,stars FROM orders WHERE id=? AND user=?').bind(String(url.searchParams.get('id')||''),u.id).first();
+    if(!o)throw new HttpErr(404,'gone');
+    return{st:o.st,stars:o.stars};
+  },
 
   /* ---------- админка ---------- */
   async 'GET /api/admin/stats'(env,u,url,now){
@@ -1163,6 +1380,27 @@ const routes={
     await logA(env,u,'settings',0,info.join('; '));
     return{cfg:{maint:CFG.maint,banner:CFG.banner,sale:onSale(now),x2:onX2(now),prizes:CFG.prizes,refBonus:CFG.refBonus,refNew:CFG.refNew,glimit:CFG.glimit,refHoldN:CFG.refHoldN,alertThr:CFG.alertThr}};
   },
+
+  async 'GET /api/admin/orders'(env,u,url,now){
+    needAdmin(env,u);
+    const rows=(await env.DB.prepare(`SELECT o.id,o.user,o.stars,o.st,o.created,o.paid_at,o.data,o.pid,${NAME_SQL('u')} name,(SELECT owner FROM plates WHERE id=o.pid) owner FROM orders o LEFT JOIN users u ON u.id=o.user WHERE o.st IN('paid','refunded') ORDER BY COALESCE(o.paid_at,o.created) DESC LIMIT 40`).all()).results;
+    const sum=await env.DB.prepare("SELECT COALESCE(SUM(stars),0) s,COUNT(*) n FROM orders WHERE st='paid'").first();
+    return{list:rows.map(r=>({id:r.id,user:r.user,name:r.name||'',stars:r.stars,st:r.st,at:r.paid_at||r.created,text:plateText(JSON.parse(r.data)),movable:r.owner===r.user})),stars:sum.s,count:sum.n};
+  },
+  async 'POST /api/admin/order-refund'(env,u,url,now,b){
+    needAdmin(env,u);
+    const o=await env.DB.prepare("SELECT id,user,k,pid,data,stars,st,charge FROM orders WHERE id=?").bind(String(b.id||'')).first();
+    if(!o||o.st!=='paid'||!o.charge)throw new HttpErr(410,'gone');
+    const pl=await env.DB.prepare('SELECT owner FROM plates WHERE id=?').bind(o.pid).first();
+    if(pl&&pl.owner!==o.user)throw new HttpErr(409,'moved');
+    const r=await tgCall(env,'refundStarPayment',{user_id:o.user,telegram_payment_charge_id:o.charge});
+    if(!r||!r.ok){console.log('refund fail',JSON.stringify(r));throw new HttpErr(502,'tgfail',{info:String(r&&r.description||'')})}
+    if(pl){await unlistPlate(env,o.pid,now);await env.DB.prepare('DELETE FROM plates WHERE id=?').bind(o.pid).run()}
+    await env.DB.batch([env.DB.prepare("UPDATE orders SET st='refunded' WHERE id=?").bind(o.id),env.DB.prepare('DELETE FROM issued WHERE k=?').bind(o.k)]);
+    await logA(env,u,'order-refund',o.user,`${plateText(JSON.parse(o.data))} · ${o.stars}⭐`);
+    bg(notify(env,o.user,`⭐ Покупка номера <b>${esc(plateText(JSON.parse(o.data)))}</b> отменена, ${o.stars} звёзд возвращены.`));
+    return{ok:true};
+  },
   async 'GET /api/admin/log'(env,u,url,now){
     needAdmin(env,u);
     const off=Math.max(0,Math.min(100000,+url.searchParams.get('off')||0));
@@ -1284,6 +1522,7 @@ const routes={
       throw new HttpErr(409,'low',{min:aucMin(c)});
     }
     if(a.bidder)bg((async()=>notify(env,a.bidder,`📈 Вашу ставку на номер <b>${esc(await plateNm(env,a.plate_id))}</b> перебили: теперь ${fmtN(amt)}. Ваши ${fmtN(a.bid)} вернулись на счёт.`))());
+    await qProg(env,u.id,'bid',1,now);
     return{coins:u.coins-amt,bid:amt,ends,min:aucMin({bidder:u.id,bid:amt,start:a.start})};
   },
   async 'POST /api/auction/cancel'(env,u,url,now,b){
@@ -1322,26 +1561,39 @@ const routes={
     const refBonus=await refPay(env,u,now);
     await achSync(env,u,now);
     const ar=(await env.DB.prepare('SELECT COUNT(*) n FROM ach WHERE user=? AND claimed=0').bind(u.id).first()).n;
-    return{refBonus,achReady:ar,cfg:cfgOut(now),banner:CFG.banner&&CFG.banner.text?CFG.banner:null,user:{...userOut(u,env),subWarn:isAdmin(env,u.id)&&subErr>0&&now-subErr<36e5},inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},daily:dailyOf(u,now),wheel:wheelOf(u,now),reset:dayEnd(now),now};
+    const ql=await qList(env,u.id,now);
+    return{refBonus,achReady:ar,pity:pityOf(u),pityN:PITY,qReady:ql.ready,cfg:cfgOut(now),banner:CFG.banner&&CFG.banner.text?CFG.banner:null,user:{...userOut(u,env),subWarn:isAdmin(env,u.id)&&subErr>0&&now-subErr<36e5},inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},daily:dailyOf(u,now),wheel:wheelOf(u,now),reset:dayEnd(now),now};
   },
   async 'POST /api/spin'(env,u,url,now,b){
     const c=String(b.c);if(!C[c])throw new HttpErr(400,'bad');
     const ti=int(b.tier,0,TIERS.length-1),T=TIERS[ti],n=int(b.n,1,5),cost=tierPrice(T,ti,now)*n;
     if(u.coins<cost)throw new HttpErr(402,'coins');
-    const plates=[];for(let i=0;i<n;i++)plates.push(await claimPlate(env,c,wpick(T.w),now));
+    const P=pityOf(u),fl=T.w.findIndex(x=>x>0),thr=PITY[ti];let cnt=P[ti]|0,forced=false;const grades=[];
+    for(let i=0;i<n;i++){
+      let g;
+      if(cnt+1>=thr){g=wpick(T.w.map((x,j)=>j>fl?x:0));forced=true}else g=wpick(T.w);
+      grades.push(g);cnt=g>fl?0:cnt+1;
+    }
+    P[ti]=cnt;
+    const plates=[];for(let i=0;i<n;i++)plates.push(await claimPlate(env,c,grades[i],now));
     const st=plates.map(p=>env.DB.prepare("INSERT INTO plates(id,owner,st,c,rar,v,data,created) SELECT ?,?,'own',?,?,?,?,? WHERE (SELECT coins FROM users WHERE id=?)>=?").bind(p.id,u.id,p.c,p.rar,p.v,JSON.stringify(strip(p)),now,u.id,cost));
-    st.push(env.DB.prepare('UPDATE users SET coins=coins-?,spins=spins+? WHERE id=? AND coins>=?').bind(cost,n,u.id,cost));
+    st.push(env.DB.prepare('UPDATE users SET coins=coins-?,spins=spins+?,pity=? WHERE id=? AND coins>=?').bind(cost,n,JSON.stringify(P),u.id,cost));
     const res=await env.DB.batch(st);
     if(res[n].meta.changes!==1)throw new HttpErr(402,'coins');
-    u.spins+=n;
-    return{coins:u.coins-cost,spins:u.spins,achReady:await achCount(env,u,now),plates:plates.map(p=>({...p,paid:T.price,st:'own',t:now}))};
+    u.spins+=n;u.pity=JSON.stringify(P);
+    await qProg(env,u.id,'spin',n,now);
+    if(plates.some(p=>p.rar>=2))await qProg(env,u.id,'rare',1,now);
+    return{coins:u.coins-cost,spins:u.spins,pity:P,forced,achReady:await achCount(env,u,now),plates:plates.map(p=>({...p,paid:T.price,st:'own',t:now}))};
   },
   async 'POST /api/sell'(env,u,url,now,b){
     const ids=[...new Set(Array.isArray(b.ids)?b.ids.map(String):[])].slice(0,60);
     if(!ids.length)throw new HttpErr(400,'bad');
     const q=ids.map(()=>'?').join(',');
-    const rows=(await env.DB.prepare(`SELECT id,v FROM plates WHERE owner=? AND st='own' AND id IN(${q})`).bind(u.id,...ids).all()).results;
-    if(!rows.length)throw new HttpErr(409,'gone');
+    const rows=(await env.DB.prepare(`SELECT id,v FROM plates WHERE owner=? AND st='own' AND COALESCE(json_extract(data,'$.star'),0)=0 AND id IN(${q})`).bind(u.id,...ids).all()).results;
+    if(!rows.length){
+      const sx=await env.DB.prepare(`SELECT 1 x FROM plates WHERE owner=? AND st='own' AND json_extract(data,'$.star')=1 AND id IN(${q})`).bind(u.id,...ids).first();
+      throw new HttpErr(409,sx?'star':'gone');
+    }
     const st=[];
     for(const r of rows){
       st.push(env.DB.prepare("UPDATE users SET coins=coins+? WHERE id=? AND EXISTS(SELECT 1 FROM plates WHERE id=? AND owner=? AND st='own')").bind(Math.floor(r.v*SELL),u.id,r.id,u.id));
@@ -1350,6 +1602,7 @@ const routes={
     const res=await env.DB.batch(st);
     const sold=[];let gained=0;
     rows.forEach((r,i)=>{if(res[i*2+1].meta.changes===1){sold.push(r.id);gained+=Math.floor(r.v*SELL)}});
+    await qProg(env,u.id,'sell',sold.length,now);
     return{coins:await coinsOf(env,u.id),sold,gained};
   },
   async 'POST /api/daily'(env,u,url,now){
@@ -1359,6 +1612,7 @@ const routes={
     const r=await env.DB.prepare('UPDATE users SET coins=coins+?,streak=?,last_day=? WHERE id=? AND last_day<?').bind(gain,d.next,t,u.id,t).run();
     if(r.meta.changes!==1)throw new HttpErr(429,'wait',{reset:dayEnd(now)});
     const u2={...u,streak:d.next,last_day:t};
+    await qProg(env,u.id,'daily',1,now);
     return{coins:u.coins+gain,gained:gain,day:d.next,daily:dailyOf(u2,now),reset:dayEnd(now),achReady:await achCount(env,u2,now)};
   },
   async 'POST /api/wheel'(env,u,url,now){
@@ -1367,6 +1621,7 @@ const routes={
     const idx=pickWheel(),gain=WHEEL[idx][0]*x2m('wheel',now);
     const r=await env.DB.prepare('UPDATE users SET coins=coins+?,wheel_day=? WHERE id=? AND wheel_day<?').bind(gain,t,u.id,t).run();
     if(r.meta.changes!==1)throw new HttpErr(429,'wait',{reset:dayEnd(now)});
+    await qProg(env,u.id,'wheel',1,now);
     return{coins:u.coins+gain,gained:gain,idx,reset:dayEnd(now)};
   },
   async 'POST /api/promo'(env,u,url,now,b){
@@ -1427,6 +1682,7 @@ const routes={
       env.DB.prepare("UPDATE plates SET st='listed' WHERE id=? AND owner=? AND st='own'").bind(id,u.id)
     ]);
     if(res[0].meta.changes!==1)throw new HttpErr(409,'gone');
+    await qProg(env,u.id,'list',1,now);
     return{lotId:lid,expires:now+LOT_TTL};
   },
   async 'POST /api/buy'(env,u,url,now,b){
@@ -1452,6 +1708,7 @@ const routes={
     const pp=plateOf(pr);
     bg(notify(env,lot.seller,`💰 Ваш номер <b>${esc(plateText(pp))}</b> купили за ${fmtN(lot.price)}. Начислено <b>+${fmtN(Math.floor(lot.price*(100-COMM)/100))}</b> монет.`));
     bg(achSync(env,{id:lot.seller},now));
+    await qProg(env,u.id,'buy',1,now);
     return{coins:await coinsOf(env,u.id),plate:pp,achReady:await achCount(env,u,now)};
   },
   async 'POST /api/cancel'(env,u,url,now,b){
@@ -1510,7 +1767,13 @@ async function onHook(req,env){
   let d=sec.length^want.length;for(let i=0;i<want.length;i++)d|=sec.charCodeAt(i)^(want.charCodeAt(i));
   if(d!==0)return new Response('forbidden',{status:403});
   let up={};try{up=await req.json()}catch(e){}
+  if(up&&up.pre_checkout_query){await starsPreCheckout(env,up.pre_checkout_query,Date.now());return new Response('ok')}
   const m=up&&up.message;
+  if(m&&m.successful_payment&&m.from){try{await starsFulfil(env,m.from.id,m.successful_payment,Date.now())}catch(e){console.log('fulfil',e&&e.stack||e)}return new Response('ok')}
+  if(m&&m.chat&&m.chat.type==='private'&&m.from&&!m.from.is_bot){
+    const cm=/^\/(terms|paysupport|support)(@\w+)?\s*$/i.exec(String(m.text||''));
+    if(cm){try{await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:cm[1].toLowerCase()==='terms'?TERMS():PAYSUPPORT(),parse_mode:'HTML',disable_web_page_preview:true})}catch(e){console.log('TG',e&&e.message)}return new Response('ok')}
+  }
   if(m&&m.chat&&m.chat.type==='private'&&!(m.from&&m.from.is_bot)){
     const mm=/^\/start\s+ref_(\d{1,15})\b/.exec(String(m.text||''));
     if(mm){try{await regRef(env,m.from.id,+mm[1],Date.now())}catch(e){console.log('ref',e&&e.message)}}
@@ -1523,17 +1786,17 @@ async function ensureWebhook(env,origin){
   if(!env.BOT_TOKEN||Date.now()-whAt<6e5)return;whAt=Date.now();
   try{
     await init(env);
-    const want=origin+'/tg/hook|v1|'+await hookSecret(env);
+    const want=origin+'/tg/hook|v2|'+await hookSecret(env);
     const cur=await env.DB.prepare("SELECT v FROM meta WHERE k='wh'").first();
     if(cur&&cur.v===want)return;
-    const r=await tgCall(env,'setWebhook',{url:origin+'/tg/hook',secret_token:await hookSecret(env),allowed_updates:['message'],max_connections:20});
+    const r=await tgCall(env,'setWebhook',{url:origin+'/tg/hook',secret_token:await hookSecret(env),allowed_updates:['message','pre_checkout_query'],max_connections:20});
     if(r&&r.ok)await env.DB.prepare("INSERT INTO meta(k,v) VALUES('wh',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(want).run();
     else console.log('setWebhook failed',JSON.stringify(r));
   }catch(e){console.log('wh',e&&e.message)}
 }
 
 export default{
-  async scheduled(ev,env,ctx){curCtx=ctx;remAt=0;await init(env);await loadCfg(env,Date.now(),true);await settleAuctions(env,Date.now());await maybeReminders(env)},
+  async scheduled(ev,env,ctx){curCtx=ctx;remAt=0;await init(env);await loadCfg(env,Date.now(),true);await settleAuctions(env,Date.now());await settleLotto(env,Date.now()).catch(e=>console.log('lotto',e&&e.message));await maybeReminders(env)},
   async fetch(req,env,ctx){
     const h=cors(req,env);
     if(req.method==='OPTIONS')return new Response(null,{status:204,headers:h});
