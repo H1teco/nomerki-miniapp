@@ -686,13 +686,13 @@ main{display:flex;flex-direction:column}
 .qc2.done{opacity:.55}
 .qc2.ready{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
 .qc2.bonus{background:linear-gradient(135deg,rgba(251,191,36,.14),rgba(251,191,36,.03));border-color:rgba(251,191,36,.45)}
-.lt{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.lt .ls{padding:12px 14px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
-.lt .ls small{display:block;font-size:11px;color:var(--mut);font-weight:600}
-.lt .ls b{display:flex;align-items:center;gap:6px;margin-top:4px;font:500 16px 'Unbounded',sans-serif}
-.lt .ls b .coin{width:14px;height:14px}
-.lt .big{grid-column:1/-1;background:linear-gradient(135deg,rgba(251,191,36,.16),rgba(251,191,36,.04));border-color:rgba(251,191,36,.5)}
-.lt .big b{font-size:22px;color:var(--gold)}
+.lto{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lto .ls{padding:12px 14px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+.lto .ls small{display:block;font-size:11px;color:var(--mut);font-weight:600}
+.lto .ls b{display:flex;align-items:center;gap:6px;margin-top:4px;font:500 16px 'Unbounded',sans-serif}
+.lto .ls b .coin{width:14px;height:14px}
+.lto .big{grid-column:1/-1;background:linear-gradient(135deg,rgba(251,191,36,.16),rgba(251,191,36,.04));border-color:rgba(251,191,36,.5)}
+.lto .big b{font-size:22px;color:var(--gold)}
 .lbuy{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
 .lbuy button{height:56px;border-radius:16px;background:var(--card);border:1px solid var(--line);color:var(--tx);font:600 14px Onest,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
 .lbuy button small{font-size:11px;color:var(--mut);font-weight:500}
@@ -1256,7 +1256,7 @@ function paintLotto(){
   const lw=l.last;
   const lastHTML=lw?(lw.winner?`<div class="lwin${lw.mine?' me':''}">${lw.mine?'<b>Вы выиграли в прошлом розыгрыше!</b>':'Прошлый розыгрыш:'} ${lw.mine?'':`победил <b>${esc(lw.winner.name)}</b>, `}приз <b>${fmt(lw.prize)}</b> монет (${lw.tickets} ${plural(lw.tickets,'билет','билета','билетов')}, ${lw.players} ${plural(lw.players,'игрок','игрока','игроков')})</div>`:`<div class="lwin">В прошлый раз участников было мало, билеты вернули.</div>`):'';
   body.innerHTML=`<p class="rwhint">Билет стоит ${fmt(l.price)} монет, до ${l.max} в сутки. Каждый день в полночь по Астане разыгрывается банк: победитель получает ${100-l.fee}%. Чем больше у вас билетов, тем выше шанс. Если участник один, билеты возвращаются.</p>
-    <div class="lt"><div class="ls big"><small>Приз сейчас</small><b><i class="coin"></i>${fmt(l.prize)}</b></div>
+    <div class="lto"><div class="ls big"><small>Приз сейчас</small><b><i class="coin"></i>${fmt(l.prize)}</b></div>
       <div class="ls"><small>Всего билетов</small><b>${fmt(l.tickets)}</b></div>
       <div class="ls"><small>Участников</small><b>${fmt(l.players)}</b></div>
       <div class="ls"><small>Ваши билеты</small><b>${l.mine}<span style="font:500 12px Onest,sans-serif;color:var(--mut)">&nbsp;из ${l.max}</span></b></div>

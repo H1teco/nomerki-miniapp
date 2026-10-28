@@ -758,8 +758,18 @@ async function settleLotto(env,now){
   await env.DB.prepare('DELETE FROM lotto WHERE day<?').bind(day-30).run();
 }
 /* номера на заказ за Telegram Stars */
-const STAR_DIV=20,STAR_MIN=50,STAR_MAX=10000,RESV_TTL=15*60e3;
-const starsOf=v=>Math.max(STAR_MIN,Math.round(v/STAR_DIV/10)*10);
+const STAR_DIV=60,STAR_MIN=25,STAR_MAX=10000,RESV_TTL=15*60e3;
+const starsOf=v=>Math.min(STAR_MAX,Math.max(STAR_MIN,Math.round(v/STAR_DIV/5)*5));
+/* номер занят, только если он реально лежит у игрока; старые записи реестра без номера (проданные системе) не мешают */
+async function plateTaken(env,p,now){
+  const k=plateKey(p);
+  if(await plateOwnerByKey(env,p))return true;
+  const r=await env.DB.prepare('SELECT ts FROM issued WHERE k=?').bind(k).first();
+  if(!r)return false;
+  if(now-r.ts<60e3)return true;
+  await env.DB.prepare('DELETE FROM issued WHERE k=?').bind(k).run();
+  return false;
+}
 const TERMS=()=>`📄 <b>Условия покупки номеров на заказ</b>
 
 1. За ⭐ Telegram Stars вы покупаете цифровой товар: уникальный номер в игре «Гараж номеров». Номер нельзя сдать системе за монеты, но можно продать или обменять на рынке и аукционе.
@@ -781,6 +791,7 @@ async function starsFulfil(env,from,sp,now){
   }
   if(o.st==='paid'||o.st==='refunded')return;
   const p=JSON.parse(o.data);
+  await plateTaken(env,p,now);
   const res=await env.DB.batch([
     env.DB.prepare('INSERT OR IGNORE INTO issued(k,ts) VALUES(?,?)').bind(o.k,now),
     env.DB.prepare("INSERT INTO plates(id,owner,st,c,rar,v,data,created) SELECT ?,?,'own',?,?,?,?,? WHERE (SELECT changes())=1").bind(o.pid,o.user,p.c,p.rar,p.v,JSON.stringify(strip(p)),now),
@@ -803,8 +814,8 @@ async function starsPreCheckout(env,q,now){
     if(!o||o.user!==(q.from&&q.from.id)||o.stars!==q.total_amount||q.currency!=='XTR')return bad('Заказ не найден. Откройте покупку в игре заново.');
     if(o.st==='paid')return bad('Этот заказ уже оплачен.');
     if(o.st==='refunded')return bad('Заказ отменён.');
-    const taken=await env.DB.prepare('SELECT 1 x FROM issued WHERE k=?').bind(o.k).first();
-    if(taken)return bad('Этот номер уже занят. Выберите другой.');
+    const od=await env.DB.prepare('SELECT data FROM orders WHERE id=?').bind(o.id).first();
+    if(await plateTaken(env,JSON.parse(od.data),now))return bad('Этот номер уже занят. Выберите другой.');
     const r=await env.DB.prepare('INSERT INTO resv(k,oid,until) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET until=excluded.until WHERE resv.oid=excluded.oid OR resv.until<?').bind(o.k,o.id,now+RESV_TTL,now).run();
     if(r.meta.changes!==1)return bad('Этот номер сейчас оплачивает другой игрок.');
     await env.DB.prepare("UPDATE resv SET oid=? WHERE k=?").bind(o.id,o.k).run();
@@ -858,19 +869,18 @@ const routes={
   /* ----- номер на заказ за Telegram Stars ----- */
   async 'POST /api/custom/preview'(env,u,url,now,b){
     const{p,warn}=customPlate(String(b.c),b.d,b.l,b.reg);
-    const stars=starsOf(p.v),owner=await plateOwnerByKey(env,p);
-    const issued=await env.DB.prepare('SELECT 1 x FROM issued WHERE k=?').bind(plateKey(p)).first();
+    const stars=starsOf(p.v),taken=await plateTaken(env,p,now);
     const rv=await env.DB.prepare('SELECT oid,until FROM resv WHERE k=?').bind(plateKey(p)).first();
     const busy=!!(rv&&rv.until>now);
     const{id,...pl}=p;
-    return{plate:{...pl,id:'preview'},text:plateText(p),stars,taken:!!(owner||issued),busy,blocked:!!warn,toobig:stars>STAR_MAX,max:STAR_MAX};
+    return{plate:{...pl,id:'preview'},text:plateText(p),stars,taken,busy,blocked:!!warn,toobig:false,max:STAR_MAX};
   },
   async 'POST /api/custom/invoice'(env,u,url,now,b){
     const{p,warn}=customPlate(String(b.c),b.d,b.l,b.reg);
     if(warn)throw new HttpErr(409,'blocked');
-    const stars=starsOf(p.v);if(stars>STAR_MAX)throw new HttpErr(409,'toobig',{max:STAR_MAX});
+    const stars=starsOf(p.v);
     const key=plateKey(p);
-    if(await env.DB.prepare('SELECT 1 x FROM issued WHERE k=?').bind(key).first()||await plateOwnerByKey(env,p))throw new HttpErr(409,'taken');
+    if(await plateTaken(env,p,now))throw new HttpErr(409,'taken');
     const pend=(await env.DB.prepare("SELECT COUNT(*) n FROM orders WHERE user=? AND st='new' AND created>?").bind(u.id,now-36e5).first()).n;
     if(pend>=10)throw new HttpErr(429,'slow');
     const oid=uid();
@@ -1589,7 +1599,7 @@ const routes={
     const ids=[...new Set(Array.isArray(b.ids)?b.ids.map(String):[])].slice(0,60);
     if(!ids.length)throw new HttpErr(400,'bad');
     const q=ids.map(()=>'?').join(',');
-    const rows=(await env.DB.prepare(`SELECT id,v FROM plates WHERE owner=? AND st='own' AND COALESCE(json_extract(data,'$.star'),0)=0 AND id IN(${q})`).bind(u.id,...ids).all()).results;
+    const rows=(await env.DB.prepare(`SELECT id,v,data FROM plates WHERE owner=? AND st='own' AND COALESCE(json_extract(data,'$.star'),0)=0 AND id IN(${q})`).bind(u.id,...ids).all()).results;
     if(!rows.length){
       const sx=await env.DB.prepare(`SELECT 1 x FROM plates WHERE owner=? AND st='own' AND json_extract(data,'$.star')=1 AND id IN(${q})`).bind(u.id,...ids).first();
       throw new HttpErr(409,sx?'star':'gone');
@@ -1602,6 +1612,8 @@ const routes={
     const res=await env.DB.batch(st);
     const sold=[];let gained=0;
     rows.forEach((r,i)=>{if(res[i*2+1].meta.changes===1){sold.push(r.id);gained+=Math.floor(r.v*SELL)}});
+    const rel=rows.filter(r=>sold.includes(r.id)).map(r=>plateKey(JSON.parse(r.data)));
+    if(rel.length)await env.DB.prepare(`DELETE FROM issued WHERE k IN(${rel.map(()=>'?').join(',')})`).bind(...rel).run();
     await qProg(env,u.id,'sell',sold.length,now);
     return{coins:await coinsOf(env,u.id),sold,gained};
   },
