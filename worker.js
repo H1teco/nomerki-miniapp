@@ -358,20 +358,20 @@ const avaOf=u=>u.av?`/api/ava/${u.id}?v=${u.av}`:(u.photo||'');
 const userOut=(u,env)=>({id:u.id,name:dnOf(u),tname:u.name,custom:!!(u.dname&&String(u.dname).trim()),hasAva:!!u.av,ava:avaOf(u),coins:u.coins,spins:u.spins,admin:isAdmin(env,u.id)});
 const REF_MAX=50;
 /* настройки, которые админ меняет из панели; хранятся в meta('cfg') и подтягиваются раз в 15 с */
-const CFG={shopP:{},prizes:[100000,50000,25000],refBonus:15000,refNew:5000,glimit:100000,refHoldN:5,alertThr:200000,maint:'',banner:null,sale:null,x2:null,t:0};
-const CFG_KEYS=['shopP','prizes','refBonus','refNew','glimit','refHoldN','alertThr','maint','banner','sale','x2'];
+const CFG={srW:null,csW:null,cases:[],shopP:{},prizes:[100000,50000,25000],refBonus:15000,refNew:5000,glimit:100000,refHoldN:5,alertThr:200000,maint:'',banner:null,sale:null,x2:null,t:0};
+const CFG_KEYS=['srW','csW','cases','shopP','prizes','refBonus','refNew','glimit','refHoldN','alertThr','maint','banner','sale','x2'];
 async function loadCfg(env,now,force){
   if(!force&&now-CFG.t<15000)return;CFG.t=now;
   try{
     const r=await env.DB.prepare("SELECT v FROM meta WHERE k='cfg'").first();
     if(r){const o=JSON.parse(r.v);CFG_KEYS.forEach(k=>{if(o[k]!==undefined)CFG[k]=o[k]})}
   }catch(e){console.log('cfg',e&&e.message)}
-  applyShopP();
+  applyShopP();applyOdds();
 }
 async function saveCfg(env,patch,now){
   await loadCfg(env,now,true);
   CFG_KEYS.forEach(k=>{if(patch[k]!==undefined)CFG[k]=patch[k]});
-  applyShopP();
+  applyShopP();applyOdds();
   const o={};CFG_KEYS.forEach(k=>{o[k]=CFG[k]});
   await env.DB.prepare("INSERT INTO meta(k,v) VALUES('cfg',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify(o)).run();
 }
@@ -920,10 +920,40 @@ const SHOP_DEF=Object.fromEntries(Object.entries(SHOP).map(([k,v])=>[k,v.stars])
 function applyShopP(){const o=CFG.shopP||{};for(const k of Object.keys(SHOP)){const v=Math.trunc(+o[k]);SHOP[k].stars=v>=1&&v<=10000?v:SHOP_DEF[k]}}
 const SR_W=[0,0,0,84,14,2];                       /* звёздная рулетка: эпичный / легендарный / мифический, % */
 const CS_BANDS=[[0,12e4,74],[12e4,25e4,21],[25e4,1e12,5]]; /* мифический кейс: по оценке номера, монет; шанс % */
+const SR_DEF=SR_W.slice(),CS_DEF=CS_BANDS.map(b=>b[2]);
+/* шансы можно менять из админки: хранятся в CFG.srW (6 весов по редкости) и CFG.csW (3 веса по диапазонам) */
+const wOk=(a,n)=>Array.isArray(a)&&a.length===n&&a.every(x=>Number.isFinite(+x)&&+x>=0)&&a.reduce((t,x)=>t+(+x),0)>0;
+function applyOdds(){
+  const sr=wOk(CFG.srW,6)?CFG.srW.map(Number):SR_DEF;for(let i=0;i<6;i++)SR_W[i]=sr[i];
+  const cs=wOk(CFG.csW,3)?CFG.csW.map(Number):CS_DEF;CS_BANDS.forEach((b,i)=>{b[2]=cs[i]});
+}
+/* свои кейсы (создаёт админ): за монеты или Telegram Stars, шансы по редкости */
+const CC_MAX=12;
+const ccList=()=>Array.isArray(CFG.cases)?CFG.cases:[];
+const ccPub=c=>({id:c.id,name:c.name,desc:c.desc||'',cur:c.cur,price:c.price,n:c.n,w:c.w});
+const ccFind=id=>ccList().find(x=>x.id===id&&x.on);
+function ccClean(b){
+  const name=String(b.name||'').replace(/\s+/g,' ').trim().slice(0,24),desc=String(b.desc||'').replace(/\s+/g,' ').trim().slice(0,120);
+  const cur=b.cur==='coins'?'coins':b.cur==='stars'?'stars':null;
+  if(!name||!cur)throw new HttpErr(400,'bad');
+  const price=int(b.price,cur==='stars'?1:100,cur==='stars'?10000:1e8),n=int(b.n,1,10);
+  if(!wOk(b.w,6)||b.w.some(x=>+x>1e6))throw new HttpErr(400,'bad');
+  return{name,desc,cur,price,n,w:b.w.map(x=>Math.round(+x*1000)/1000),on:b.on!==false};
+}
 const CS_DG3=['001','002','003','005','007','100','111','222','333','444','555','666','777','888','999','123','700','500','099','199'];
 const CS_DG4=['0001','0002','0003','0005','0007','0100','0777','1000','1111','2222','3333','4444','5555','6666','7777','8888','9999','1234','0555','0999'];
 const ri=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n};
+const srMinText=()=>{const m=SR_W.findIndex(x=>x>0);return m<=0?'номер любого качества':m>=5?'мифический номер':RAR_N[m].toLowerCase()+' номер или выше'};
+const isCC=id=>String(id||'').startsWith('cc:');
+function shopGet(id,od){
+  if(isCC(id)){
+    if(od&&od.cw)return{k:'cc',n:od.n|0,w:od.cw,stars:0};
+    const c=ccFind(String(id).slice(3));return c&&c.cur==='stars'?{k:'cc',n:c.n,w:c.w,stars:c.price,c}:null;
+  }
+  return SHOP[id]||null;
+}
 function shopText(od){
+  if(od&&isCC(od.shop))return`кейс «${od.name||'?'}» · ${(C[od.c]||{}).name||''}`;
   const S=SHOP[od&&od.shop];if(!S)return'магазин';
   if(S.k==='pack')return`пакет ${fmtN(S.coins)} монет`;
   if(S.k==='sr')return`звёздная рулетка ×${S.n} · ${(C[od.c]||{}).name||''}`;
@@ -964,7 +994,7 @@ async function shopFail(env,o,charge,now,msg){
   bg(notify(env,o.user,r&&r.ok?`⭐ ${msg} Звёзды возвращены.`:`⭐ ${msg} Напишите /paysupport, мы вернём звёзды.`));
 }
 async function shopFulfil(env,o,od,charge,now){
-  const S=SHOP[od.shop];
+  const S=isCC(od.shop)?(wOk(od.cw,6)?shopGet(od.shop,od):null):SHOP[od.shop];
   if(!S)return shopFail(env,o,charge,now,'Товар не найден.');
   const mark=env.DB.prepare("UPDATE orders SET st='paid',charge=?,paid_at=? WHERE id=? AND st IN('new','cancelled')").bind(charge,now,o.id);
   if(S.k==='pack'||S.k==='bx'||S.k==='bl'||S.k==='ba'){
@@ -977,12 +1007,12 @@ async function shopFulfil(env,o,od,charge,now){
     bg(notify(env,o.user,S.k==='pack'?`⭐ Оплата прошла. На счёт зачислено <b>+${fmtN(S.coins)}</b> монет.`:S.k==='bx'?`⭐ Оплата прошла. Ускоритель ×2 включён на ${S.days} дней: ежедневные награды и колесо удваиваются.`:S.k==='bl'?`⭐ Оплата прошла. Лимит лотов на рынке увеличен на ${S.add}.`:`⭐ Оплата прошла. Лимит аукционов увеличен на ${S.add}.`));
     return;
   }
-  const c=od.c,n=S.k==='sr'?S.n:1,plates=[];
+  const c=od.c,n=S.k==='sr'||S.k==='cc'?S.n:1,plates=[];
   try{
     if(!C[c])throw new Error('bad c');
     for(let i=0;i<n;i++){
-      const p=S.k==='cs'?await claimCase(env,c,now):await claimPlate(env,c,wpick(SR_W),now);
-      p.star=1;p.tags=[...(p.tags||[]),S.k==='cs'?'Мифический кейс':'Звёздная рулетка'];
+      const p=S.k==='cs'?await claimCase(env,c,now):await claimPlate(env,c,wpick(S.k==='cc'?S.w:SR_W),now);
+      p.star=1;p.tags=[...(p.tags||[]),S.k==='cs'?'Мифический кейс':S.k==='cc'?('Кейс «'+String(od.name||'').slice(0,24)+'»'):'Звёздная рулетка'];
       plates.push(p);
     }
   }catch(e){
@@ -998,7 +1028,7 @@ async function shopFulfil(env,o,od,charge,now){
     await env.DB.batch(plates.map(p=>env.DB.prepare('DELETE FROM issued WHERE k=?').bind(plateKey(p))));
     return;
   }
-  bg(notify(env,o.user,`⭐ Оплата прошла. ${S.k==='cs'?'Из кейса выпало':'Выпало'}: ${plates.map(p=>'<b>'+esc(plateText(p))+'</b>').join(', ')}. Номера уже в гараже.`));
+  bg(notify(env,o.user,`⭐ Оплата прошла. ${S.k==='cs'||S.k==='cc'?'Из кейса выпало':'Выпало'}: ${plates.map(p=>'<b>'+esc(plateText(p))+'</b>').join(', ')}. Номера уже в гараже.`));
   bg(achSync(env,{id:o.user},now));
 }
 
@@ -1208,21 +1238,45 @@ const routes={
     return{ok:true};
   },
 
+  /* кейс за монеты: списание и выдача одним пакетом, как у обычной рулетки */
+  async 'POST /api/case/open'(env,u,url,now,b){
+    const cs=ccFind(String(b.id||''));
+    if(!cs||cs.cur!=='coins')throw new HttpErr(404,'gone');
+    const c=String(b.c||'');if(!C[c])throw new HttpErr(400,'bad');
+    if(u.coins<cs.price)throw new HttpErr(402,'coins');
+    const plates=[];
+    try{for(let i=0;i<cs.n;i++)plates.push(await claimPlate(env,c,wpick(cs.w),now))}
+    catch(e){await env.DB.batch(plates.map(p=>env.DB.prepare('DELETE FROM issued WHERE k=?').bind(plateKey(p))));throw e}
+    for(const p of plates)p.tags=[...(p.tags||[]),'Кейс «'+cs.name+'»'];
+    const st=plates.map(p=>env.DB.prepare("INSERT INTO plates(id,owner,st,c,rar,v,data,created) SELECT ?,?,'own',?,?,?,?,? WHERE (SELECT coins FROM users WHERE id=?)>=?").bind(p.id,u.id,p.c,p.rar,p.v,JSON.stringify(strip(p)),now,u.id,cs.price));
+    st.push(env.DB.prepare('UPDATE users SET coins=coins-?,spins=spins+? WHERE id=? AND coins>=?').bind(cs.price,cs.n,u.id,cs.price));
+    const res=await env.DB.batch(st);
+    if(res[plates.length].meta.changes!==1){
+      await env.DB.batch(plates.map(p=>env.DB.prepare('DELETE FROM issued WHERE k=?').bind(plateKey(p))));
+      throw new HttpErr(402,'coins');
+    }
+    await qProg(env,u.id,'spin',cs.n,now);
+    if(plates.some(p=>p.rar>=2))await qProg(env,u.id,'rare',1,now);
+    bg(achSync(env,{id:u.id},now));
+    return{coins:u.coins-cs.price,plates:plates.map(p=>({...p,paid:Math.round(cs.price/cs.n),st:'own',t:now}))};
+  },
+
   async 'GET /api/shop'(env,u,url,now){
-    return{items:Object.fromEntries(Object.entries(SHOP).filter(([k])=>SLOTS_ON||!SLOT_KEYS.includes(k)).map(([k,v])=>[k,{...v}])),srW:SR_W,csBands:CS_BANDS.map(b=>({from:b[0],to:b[1]>1e11?0:b[1],w:b[2]})),bx:u.bx>now?u.bx:0,xl:u.xl|0,xa:u.xa|0,lots:MAX_LOTS+(u.xl|0),auc:MAX_AUC+(u.xa|0),regions:Object.fromEntries(Object.entries(C).map(([k,v])=>[k,v.name]))};
+    return{items:Object.fromEntries(Object.entries(SHOP).filter(([k])=>SLOTS_ON||!SLOT_KEYS.includes(k)).map(([k,v])=>[k,{...v}])),srW:SR_W,cases:ccList().filter(x=>x.on).map(ccPub),csBands:CS_BANDS.map(b=>({from:b[0],to:b[1]>1e11?0:b[1],w:b[2]})),bx:u.bx>now?u.bx:0,xl:u.xl|0,xa:u.xa|0,lots:MAX_LOTS+(u.xl|0),auc:MAX_AUC+(u.xa|0),regions:Object.fromEntries(Object.entries(C).map(([k,v])=>[k,v.name]))};
   },
   async 'POST /api/shop/invoice'(env,u,url,now,b){
-    const id=String(b.item||''),S=SHOP[id];
+    const id=String(b.item||''),S=shopGet(id);
     if(!S||(!SLOTS_ON&&SLOT_KEYS.includes(id)))throw new HttpErr(400,'bad');
     const od={shop:id};
-    if(S.k==='sr'||S.k==='cs'){const c=String(b.c||'');if(!C[c])throw new HttpErr(400,'bad');od.c=c}
+    if(S.k==='sr'||S.k==='cs'||S.k==='cc'){const c=String(b.c||'');if(!C[c])throw new HttpErr(400,'bad');od.c=c}
+    if(S.k==='cc'){od.cw=S.w;od.n=S.n;od.name=S.c.name}
     if((S.k==='bl'&&(u.xl|0)>=S.cap)||(S.k==='ba'&&(u.xa|0)>=S.cap))throw new HttpErr(409,'max');
     const recent=(await env.DB.prepare("SELECT COUNT(*) n FROM orders WHERE user=? AND k LIKE 'shop:%' AND st IN('new','cancelled') AND created>?").bind(u.id,now-6e4).first()).n;
     if(recent>=8)throw new HttpErr(429,'slow');
     await env.DB.prepare("UPDATE orders SET st='cancelled' WHERE user=? AND k LIKE 'shop:%' AND st='new'").bind(u.id).run();
     const oid=uid(),text=shopText(od);
     await env.DB.prepare("INSERT INTO orders(id,user,k,pid,data,stars,created) VALUES(?,?,?,?,?,?,?)").bind(oid,u.id,'shop:'+id,'',JSON.stringify(od),S.stars,now).run();
-    const desc=S.k==='pack'?`${fmtN(S.coins)} монет на ваш счёт. Зачислятся сразу после оплаты.`:S.k==='sr'?`${S.n} прокрут. звёздной рулетки: гарантированно эпичный номер или выше (${C[od.c].name}). Шансы показаны в игре.`:S.k==='bx'?`Ежедневные награды и колесо ×2 на ${S.days} дней.`:S.k==='bl'?`Больше лотов на рынке: +${S.add}. Навсегда.`:S.k==='ba'?`Больше аукционов одновременно: +${S.add}. Навсегда.`:`Один мифический номер (${C[od.c].name}) из топовых комбинаций. Шансы показаны в игре.`;
+    const desc=S.k==='cc'?`${S.n} ${S.n===1?'номер':'номера(ов)'} из кейса «${S.c.name}» (${C[od.c].name}). Шансы показаны в игре.`:S.k==='pack'?`${fmtN(S.coins)} монет на ваш счёт. Зачислятся сразу после оплаты.`:S.k==='sr'?`${S.n} прокрут. звёздной рулетки: ${srMinText()} (${C[od.c].name}). Шансы показаны в игре.`:S.k==='bx'?`Ежедневные награды и колесо ×2 на ${S.days} дней.`:S.k==='bl'?`Больше лотов на рынке: +${S.add}. Навсегда.`:S.k==='ba'?`Больше аукционов одновременно: +${S.add}. Навсегда.`:`Один мифический номер (${C[od.c].name}) из топовых комбинаций. Шансы показаны в игре.`;
     const inv=await tgCall(env,'createInvoiceLink',{title:text.charAt(0).toUpperCase().concat(text.slice(1)).slice(0,32),description:desc.slice(0,255),payload:oid,provider_token:'',currency:'XTR',prices:[{label:'Товар',amount:S.stars}]});
     if(!inv||!inv.ok||typeof inv.result!=='string'){
       console.log('shop invoice fail',JSON.stringify(inv));
@@ -1805,6 +1859,46 @@ const routes={
     await env.DB.prepare('INSERT INTO partners(code,name,pct,created) VALUES(?,?,?,?)').bind(code,name,pct,now).run();
     await logA(env,u,'partner-add',0,`${code} · ${name} · ${pct}%`);
     return{ok:true,code};
+  },
+  /* ----- кейсы и шансы ----- */
+  async 'GET /api/admin/cases'(env,u,url,now){
+    needAdmin(env,u);await loadCfg(env,now,true);
+    return{srW:SR_W.slice(),srDef:SR_DEF,csW:CS_BANDS.map(b=>b[2]),csDef:CS_DEF,csBands:CS_BANDS.map(b=>({from:b[0],to:b[1]>1e11?0:b[1]})),cases:ccList(),max:CC_MAX};
+  },
+  async 'POST /api/admin/odds'(env,u,url,now,b){
+    needAdmin(env,u);await loadCfg(env,now,true);
+    const patch={},info=[];
+    if(b.srW!==undefined){
+      if(b.srW===null){patch.srW=null;info.push('рулетка ⭐: стандартные шансы')}
+      else{if(!wOk(b.srW,6)||b.srW.some(x=>+x>1e6))throw new HttpErr(400,'bad');patch.srW=b.srW.map(x=>Math.round(+x*1000)/1000);info.push('рулетка ⭐: '+patch.srW.join('/'))}
+    }
+    if(b.csW!==undefined){
+      if(b.csW===null){patch.csW=null;info.push('мифический кейс: стандартные шансы')}
+      else{if(!wOk(b.csW,3)||b.csW.some(x=>+x>1e6))throw new HttpErr(400,'bad');patch.csW=b.csW.map(x=>Math.round(+x*1000)/1000);info.push('мифический кейс: '+patch.csW.join('/'))}
+    }
+    if(!info.length)throw new HttpErr(400,'bad');
+    await saveCfg(env,patch,now);
+    await logA(env,u,'odds',0,info.join('; '));
+    return{ok:true,srW:SR_W.slice(),csW:CS_BANDS.map(x=>x[2])};
+  },
+  async 'POST /api/admin/case'(env,u,url,now,b){
+    needAdmin(env,u);await loadCfg(env,now,true);
+    const list=ccList().slice(),id=b.id?String(b.id):'';
+    const at=id?list.findIndex(x=>x.id===id):-1;
+    if(id&&at<0)throw new HttpErr(410,'gone');
+    if(b.del){
+      const was=list.splice(at,1)[0];
+      await saveCfg(env,{cases:list},now);await logA(env,u,'case-del',0,was.name);return{ok:true};
+    }
+    const c=ccClean(b);
+    if(at>=0){list[at]={id,...c}}
+    else{
+      if(list.length>=CC_MAX)throw new HttpErr(409,'max');
+      list.push({id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),...c});
+    }
+    await saveCfg(env,{cases:list},now);
+    await logA(env,u,at>=0?'case-edit':'case-add',0,`${c.name} · ${c.price}${c.cur==='stars'?'⭐':' мон.'} · ×${c.n} · ${c.w.join('/')}${c.on?'':' · выкл'}`);
+    return{ok:true,cases:list};
   },
   async 'GET /api/admin/shop-prices'(env,u,url,now){
     needAdmin(env,u);
