@@ -261,6 +261,7 @@ const DDL=[
  `CREATE TABLE IF NOT EXISTS resv(k TEXT PRIMARY KEY,oid TEXT NOT NULL,until INTEGER NOT NULL)`,
  `CREATE TABLE IF NOT EXISTS orders(id TEXT PRIMARY KEY,user INTEGER NOT NULL,k TEXT NOT NULL,pid TEXT NOT NULL,data TEXT NOT NULL,stars INTEGER NOT NULL,st TEXT NOT NULL DEFAULT 'new',charge TEXT,created INTEGER NOT NULL,paid_at INTEGER)`,
  `CREATE INDEX IF NOT EXISTS orders_user ON orders(user,st)`,
+ `CREATE TABLE IF NOT EXISTS shimg(id TEXT PRIMARY KEY,user INTEGER NOT NULL,b64 TEXT NOT NULL,ts INTEGER NOT NULL)`,
  `CREATE TABLE IF NOT EXISTS walert(id INTEGER PRIMARY KEY AUTOINCREMENT,ts INTEGER NOT NULL,user INTEGER NOT NULL,delta INTEGER NOT NULL,w_from INTEGER NOT NULL,w_to INTEGER NOT NULL,dt INTEGER NOT NULL,seen INTEGER NOT NULL DEFAULT 0)`
 ];
 let ready=null,lastClean=0;
@@ -629,6 +630,13 @@ async function settleAuctions(env,now){
       }
     }catch(e){console.log('auc',e&&e.message)}
   }
+}
+/* картинка номера для «Поделиться»: JPEG публично отдаётся по /api/shimg/<id>.jpg, чтобы Telegram мог её забрать */
+async function shimg(env,url){
+  const id=url.pathname.slice('/api/shimg/'.length).replace(/\.jpg$/i,'');
+  const r=/^[a-z0-9]{6,40}$/.test(id)?await env.DB.prepare('SELECT b64 FROM shimg WHERE id=?').bind(id).first():null;
+  if(!r)return new Response('',{status:404,headers:{'cache-control':'no-store'}});
+  return new Response(Uint8Array.from(atob(r.b64),c=>c.charCodeAt(0)),{headers:{'content-type':'image/jpeg','cache-control':'public, max-age=86400'}});
 }
 async function ava(env,url){
   const id=+url.pathname.slice(9);
@@ -1170,6 +1178,34 @@ const routes={
       if(ids.length)plates=(await env.DB.prepare(`SELECT id,st,data,created FROM plates WHERE id IN(${ids.map(()=>'?').join(',')})`).bind(...ids).all()).results.map(plateOf).sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
     }catch(e){}}
     return{st:o.st,stars:o.stars,plates};
+  },
+
+  /* ----- поделиться номером картинкой ----- */
+  /* клиент присылает готовый JPEG (base64) и подпись; сервер сохраняет и просит Telegram подготовить сообщение с фото */
+  async 'POST /api/share/prep'(env,u,url,now,b){
+    const img=String(b.img||''),cap=String(b.text||'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').trim().slice(0,300);
+    if(!img||img.length>700000||!/^\/9j\/[A-Za-z0-9+\/]+={0,2}$/.test(img))throw new HttpErr(400,'bad');
+    if(!cap)throw new HttpErr(400,'bad');
+    const recent=(await env.DB.prepare('SELECT COUNT(*) n FROM shimg WHERE user=? AND ts>?').bind(u.id,now-36e5).first()).n;
+    if(recent>=20)throw new HttpErr(429,'slow');
+    if(Math.random()<.1)await env.DB.prepare('DELETE FROM shimg WHERE ts<?').bind(now-7*DAY).run();
+    const id=uid().replace(/[^a-z0-9]/g,'');
+    await env.DB.prepare('INSERT INTO shimg(id,user,b64,ts) VALUES(?,?,?,?)').bind(id,u.id,img,now).run();
+    const link=`https://t.me/${BOT_USER}?start=ref_${u.id}`,photo=`${url.origin}/api/shimg/${id}.jpg`;
+    const r=await tgCall(env,'savePreparedInlineMessage',{user_id:u.id,result:{type:'photo',id,photo_url:photo,thumbnail_url:photo,photo_width:1080,photo_height:1080,caption:cap,reply_markup:{inline_keyboard:[[{text:'🎮 Играть',url:link}]]}},allow_user_chats:true,allow_bot_chats:false,allow_group_chats:true,allow_channel_chats:true});
+    if(!r||!r.ok||!r.result||!r.result.id){console.log('prepared fail',JSON.stringify(r));return{shot:id,msg:null}}
+    return{shot:id,msg:String(r.result.id)};
+  },
+  /* запасной путь для старых клиентов Telegram: бот присылает картинку в личку, игрок пересылает её сам */
+  async 'POST /api/share/send'(env,u,url,now,b){
+    const id=String(b.shot||'');
+    const r=/^[a-z0-9]{6,40}$/.test(id)?await env.DB.prepare('SELECT user FROM shimg WHERE id=?').bind(id).first():null;
+    if(!r||r.user!==u.id)throw new HttpErr(404,'gone');
+    const cap=String(b.text||'').trim().slice(0,300);
+    const link=`https://t.me/${BOT_USER}?start=ref_${u.id}`;
+    const x=await tgCall(env,'sendPhoto',{chat_id:u.id,photo:`${url.origin}/api/shimg/${id}.jpg`,caption:cap||'Мой номер',reply_markup:{inline_keyboard:[[{text:'🎮 Играть',url:link}]]}});
+    if(!x||!x.ok)throw new HttpErr(502,'nochat',{info:String(x&&x.description||'')});
+    return{ok:true};
   },
 
   async 'GET /api/shop'(env,u,url,now){
@@ -2224,6 +2260,7 @@ export default{
       if(key==='POST /tg/hook'){await init(env);return await onHook(req,env)}
       if(key==='GET /api/ping')return out({ok:true});
       if(req.method==='GET'&&url.pathname.startsWith('/api/ava/')){await init(env);return await ava(env,url)}
+if(req.method==='GET'&&url.pathname.startsWith('/api/shimg/')){await init(env);return await shimg(env,url)}
       const fn=routes[key];if(!fn)return out({error:'notfound'},404);
       await init(env);
       const a=await auth(req,env),now=Date.now();

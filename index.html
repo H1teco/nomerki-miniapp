@@ -1592,7 +1592,7 @@ let fitQ=0;
 const queueFit=()=>{if(fitQ)return;fitQ=requestAnimationFrame(()=>{fitQ=0;fitStatic()})};
 new MutationObserver(queueFit).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
 window.__fit={fitStatic,spills,fitSlotPlate};
-window.__t={makePlate,plateHTML,mount,slots:()=>slots,C,CMB,TIERS,SELL,UNIT,rarOf,digitMult,rollPlate,wpick,mythic,mxList,openSheet,fmt,openPlayer,openProfileEdit,openBid,openSell,loadAuc,avH,AUC:()=>AUC,S:()=>S};
+window.__t={sharePlate,plateCard,makePlate,plateHTML,mount,slots:()=>slots,C,CMB,TIERS,SELL,UNIT,rarOf,digitMult,rollPlate,wpick,mythic,mxList,openSheet,fmt,openPlayer,openProfileEdit,openBid,openSell,loadAuc,avH,AUC:()=>AUC,S:()=>S};
 const yPos=(s,i)=>-i*s.ih+(s.h-s.ih)/2;
 function sizeItems(s){const h=s.h+'px';[...s.st.children].forEach(e=>{e.style.height=h;e.style.lineHeight=h})}
 function fill(s,chars,idx){
@@ -3128,10 +3128,153 @@ const BOT_USER='LayerPlates_bot';
 const refB=()=>S.cfg&&S.cfg.refBonus!=null?S.cfg.refBonus:15000,refN=()=>S.cfg&&S.cfg.refNew!=null?S.cfg.refNew:5000;
 const refLink=()=>`https://t.me/${BOT_USER}`+(user&&user.id?`?start=ref_${user.id}`:'');
 function openTg(url){try{if(tg&&tg.openTelegramLink){tg.openTelegramLink(url);return}}catch(e){}window.open(url,'_blank')}
-function sharePlate(p){
-  hapI();
+/* ---------- картинка номера для «Поделиться» ---------- */
+/* рисуем на canvas сами (DOM-снимки в разных WebView ведут себя по-разному): 1080×1080, JPEG */
+function cssGrad(ctx,x,y,w,h,deg,stops){
+  const a=(deg-90)*Math.PI/180,cx=x+w/2,cy=y+h/2,L=Math.abs(w*Math.cos(a))+Math.abs(h*Math.sin(a));
+  const dx=Math.cos(a)*L/2,dy=Math.sin(a)*L/2,g=ctx.createLinearGradient(cx-dx,cy-dy,cx+dx,cy+dy);
+  stops.forEach(s=>g.addColorStop(s[0],s[1]));return g;
+}
+function rrect(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function cvFlag(ctx,c,x,y,w,h){
+  ctx.save();rrect(ctx,x,y,w,h,Math.min(w,h)*.1);ctx.clip();
+  if(c==='KZ'){ctx.fillStyle='#00afca';ctx.fillRect(x,y,w,h);ctx.fillStyle='#fec50c';ctx.beginPath();ctx.arc(x+w/2,y+h/2,Math.hypot(w,h)/2*.25,0,7);ctx.fill()}
+  else if(c==='RU'){ctx.fillStyle='#fff';ctx.fillRect(x,y,w,h/3+1);ctx.fillStyle='#0039a6';ctx.fillRect(x,y+h/3,w,h/3+1);ctx.fillStyle='#d52b1e';ctx.fillRect(x,y+h*2/3,w,h/3)}
+  else if(c==='UA'){ctx.fillStyle='#0057b7';ctx.fillRect(x,y,w,h/2+1);ctx.fillStyle='#ffd700';ctx.fillRect(x,y+h/2,w,h/2)}
+  else{ctx.fillStyle='#c8313e';ctx.fillRect(x,y,w,h*.66+1);ctx.fillStyle='#4aa657';ctx.fillRect(x,y+h*.66,w,h*.34);ctx.fillStyle='#fff';ctx.fillRect(x,y,w*.12,h)}
+  ctx.restore();
+  ctx.save();rrect(ctx,x,y,w,h,Math.min(w,h)*.1);ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=Math.max(1,w*.012);ctx.stroke();ctx.restore();
+}
+const CV_FR={brass:{pad:.42,fk:.9236,r:.35},chrome:{pad:.3,fk:.9455,r:.55},neon:{pad:.18,fk:.9673,r:.45},carbon:{pad:.32,fk:.9418,r:.5},gold:{pad:.3,fk:.9455,r:.55},fire:{pad:.3,fk:.9455,r:.55},ice:{pad:.3,fk:.9455,r:.55}};
+const CV_RGLOW=[null,null,null,['rgba(192,132,252,.55)',.7],['rgba(251,191,36,.65)',.9],['rgba(255,93,143,.75)',1]];
+/* сам номер: cx,cy — центр, W — ширина всей детали (с рамкой) */
+function cvPlate(ctx,p,cx,cy,W){
+  const F=p.fr&&CV_FR[p.fr]?p.fr:null,fr=F?CV_FR[F]:null;
+  const u=W/11,pu=fr?u*fr.fk:u;                       /* pu — «em» самого номера */
+  const pw=11*pu,ph=2.4*pu,px=cx-pw/2,py=cy-ph/2;
+  if(F){
+    const o=fr.pad*u,x=px-o,y=py-o,w=pw+2*o,h=ph+2*o;
+    ctx.save();
+    const glow={gold:['rgba(251,191,36,.6)',.9],fire:['rgba(255,110,0,.75)',.8],ice:['rgba(56,189,248,.6)',.9],neon:['rgba(34,211,238,.9)',.6],carbon:['rgba(225,29,72,.5)',.8],brass:null,chrome:null}[F];
+    ctx.shadowColor=glow?glow[0]:'rgba(0,0,0,.6)';ctx.shadowBlur=(glow?glow[1]:.5)*u*1.2;ctx.shadowOffsetY=glow?0:.1*u;
+    const G={
+      brass:cssGrad(ctx,x,y,w,h,160,[[0,'#d8b676'],[.45,'#a9803f'],[1,'#d3ae6a']]),
+      chrome:cssGrad(ctx,x,y,w,h,145,[[0,'#f7f9fc'],[.28,'#8e98a8'],[.5,'#eef1f5'],[.74,'#7b8493'],[1,'#e3e8ee']]),
+      neon:cssGrad(ctx,x,y,w,h,100,[[0,'#22d3ee'],[.55,'#c084fc'],[1,'#ff5d8f']]),
+      carbon:'#1d1d22',
+      gold:cssGrad(ctx,x,y,w,h,145,[[0,'#fff2a8'],[.26,'#d9a516'],[.48,'#fde58a'],[.72,'#a87608'],[1,'#ffe58a']]),
+      fire:cssGrad(ctx,x,y,w,h,135,[[0,'#ff3d00'],[.45,'#ff9100'],[.7,'#ffd600'],[1,'#ff5a00']]),
+      ice:cssGrad(ctx,x,y,w,h,160,[[0,'#e0f2fe'],[.35,'#7dd3fc'],[.55,'#38bdf8'],[1,'#e0f2fe']])
+    }[F];
+    ctx.fillStyle=G;rrect(ctx,x,y,w,h,fr.r*u);ctx.fill();ctx.restore();
+    if(F==='carbon'){ctx.save();rrect(ctx,x,y,w,h,fr.r*u);ctx.clip();ctx.strokeStyle='#2f2f36';ctx.lineWidth=.12*u;for(let t=-h;t<w+h;t+=.24*u){ctx.beginPath();ctx.moveTo(x+t,y+h);ctx.lineTo(x+t+h,y);ctx.stroke()}ctx.restore();ctx.save();ctx.strokeStyle='#e11d48';ctx.lineWidth=.07*u;rrect(ctx,x+.035*u,y+.035*u,w-.07*u,h-.07*u,fr.r*u);ctx.stroke();ctx.restore()}
+    if(F==='brass'){ctx.save();[[x+.2*u,y+.2*u],[x+w-.2*u,y+.2*u],[x+.2*u,y+h-.2*u],[x+w-.2*u,y+h-.2*u]].forEach(q=>{const g=ctx.createRadialGradient(q[0],q[1],0,q[0],q[1],.11*u);g.addColorStop(0,'#fff0c4');g.addColorStop(.55,'#8a6a2c');g.addColorStop(1,'rgba(138,106,44,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(q[0],q[1],.11*u,0,7);ctx.fill()});ctx.restore()}
+  }
+  /* корпус */
+  ctx.save();
+  const rg=!F&&CV_RGLOW[p.rar];
+  ctx.shadowColor=rg?rg[0]:'rgba(0,0,0,.55)';ctx.shadowBlur=(rg?rg[1]:.35)*pu*1.4;ctx.shadowOffsetY=rg?0:.1*pu;
+  ctx.fillStyle=cssGrad(ctx,px,py,pw,ph,180,[[0,'#ffffff'],[1,'#efefea']]);rrect(ctx,px,py,pw,ph,.26*pu);ctx.fill();ctx.restore();
+  ctx.save();ctx.strokeStyle='#111';ctx.lineWidth=.075*pu;rrect(ctx,px+.0375*pu,py+.0375*pu,pw-.075*pu,ph-.075*pu,.23*pu);ctx.stroke();ctx.restore();
+  const bw=.075*pu,ix=px+bw,iy=py+bw,iw=pw-2*bw,ih=ph-2*bw,mid=iy+ih/2;
+  const FONT='"Roboto Condensed","Arial Narrow","DejaVu Sans Condensed",sans-serif';
+  const text=(s,x,y,size,color,al)=>{ctx.font=`700 ${size}px ${FONT}`;ctx.fillStyle=color||'#0b0b0b';ctx.textAlign=al||'center';ctx.textBaseline='middle';ctx.fillText(s,x,y)};
+  const c=p.c;let bandW=0,regW=0;
+  if(c==='KZ'||c==='UA'||c==='BY'){
+    bandW=(c==='KZ'?1.4:c==='UA'?1.25:1.5)*pu;
+    if(c==='UA'){ctx.save();ctx.fillStyle=cssGrad(ctx,ix,iy,bandW,ih,180,[[0,'#1b57b8'],[1,'#0f3f94']]);ctx.fillRect(ix,iy,bandW,ih);ctx.restore()}
+    const fw=.9*pu,fh=.6*pu,th=.5*pu,gap=.07*pu,tot=fh+gap+th,top=mid-tot/2;
+    cvFlag(ctx,c,ix+(bandW-fw)/2,top,fw,fh);
+    text(c,ix+bandW/2,top+fh+gap+th/2,th,c==='UA'?'#fff':'#111');
+  }
+  if(c==='KZ'){
+    regW=2.4*pu;const rx=ix+iw-regW;ctx.save();ctx.fillStyle='#111';ctx.fillRect(rx,iy,.065*pu,ih);ctx.restore();
+    text(p.reg,rx+regW/2+.03*pu,mid,1.9*pu,'#0b0b0b');
+  }else if(c==='RU'){
+    regW=3*pu;const rx=ix+iw-regW-.1*pu,ry=iy+.1*pu,rh=ih-.2*pu;
+    ctx.save();ctx.strokeStyle='#111';ctx.lineWidth=.06*pu;rrect(ctx,rx+.03*pu,ry+.03*pu,regW-.06*pu,rh-.06*pu,.18*pu);ctx.stroke();ctx.restore();
+    text(p.reg,rx+regW/2,ry+rh*.36,1.4*pu,'#0b0b0b');
+    const sw=ctx.measureText('RUS').width;ctx.font=`700 ${.42*pu}px ${FONT}`;const rsw=ctx.measureText('RUS').width,fw=.55*pu,fh=.36*pu,g=.14*pu,tw=rsw+g+fw,sx=rx+regW/2-tw/2,sy=ry+rh*.78;void sw;
+    text('RUS',sx,sy,.42*pu,'#0b0b0b','left');cvFlag(ctx,'RU',sx+rsw+g,sy-fh/2,fw,fh);
+    regW+=.1*pu;
+  }
+  /* буквы и цифры */
+  const parts=c==='KZ'?[[p.d,1],[p.l,1]]:c==='RU'?[[p.l1,.9],[p.d,1],[p.l2,.9]]:c==='UA'?[[p.pre,1],[p.d,1],[p.suf,1]]:[[p.d,1],[p.l+'-'+p.reg,1]];
+  const base=(c==='UA'||c==='BY'?1.9:c==='KZ'?2:2)*pu,gap=.14*pu,avail=iw-bandW-regW-.3*pu,tx=ix+bandW+(iw-bandW-regW)/2;
+  const meas=k=>{let t=0;parts.forEach((q,i)=>{ctx.font=`700 ${base*k*q[1]}px ${FONT}`;t+=ctx.measureText(q[0]).width+(i?gap*k:0)});return t};
+  let k=1;for(let i=0;i<20&&meas(k)>avail;i++)k*=.95;
+  let tot=meas(k),x=tx-tot/2;
+  parts.forEach((q,i)=>{if(i)x+=gap*k;const fs=base*k*q[1];ctx.font=`700 ${fs}px ${FONT}`;const w=ctx.measureText(q[0]).width;text(q[0],x,mid+.02*pu,fs,'#0b0b0b','left');x+=w});
+}
+const CV_RC=['#8e97ad','#4ade80','#38bdf8','#c084fc','#fbbf24','#ff5d8f'];
+async function plateCard(p){
+  try{await Promise.all([document.fonts.load('700 40px "Roboto Condensed"','АВЕКМНОРСТУХ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-'),document.fonts.load('600 30px Onest','Мифический Оценка монет'),document.fonts.load('800 30px Unbounded','ГАРАЖ НОМЕРОВ 0123456789')])}catch(e){}
+  const N=1080,cv=document.createElement('canvas');cv.width=cv.height=N;const ctx=cv.getContext('2d');
+  const col=CV_RC[p.rar]||CV_RC[0];
+  const rgb=col.replace('#','').match(/../g).map(h=>parseInt(h,16)).join(',');
+  ctx.fillStyle='#0b0e14';ctx.fillRect(0,0,N,N);
+  let g=ctx.createRadialGradient(N/2,N*.4,0,N/2,N*.4,N*.62);g.addColorStop(0,`rgba(${rgb},${p.rar>=3?.34:.2})`);g.addColorStop(1,`rgba(${rgb},0)`);ctx.fillStyle=g;ctx.fillRect(0,0,N,N);
+  g=ctx.createRadialGradient(N/2,N*1.05,0,N/2,N*1.05,N*.5);g.addColorStop(0,'rgba(200,240,60,.12)');g.addColorStop(1,'rgba(200,240,60,0)');ctx.fillStyle=g;ctx.fillRect(0,0,N,N);
+  ctx.save();ctx.strokeStyle=`rgba(${rgb},.35)`;ctx.lineWidth=3;rrect(ctx,24,24,N-48,N-48,44);ctx.stroke();ctx.restore();
+  const T=(s,x,y,font,color,al)=>{ctx.font=font;ctx.fillStyle=color;ctx.textAlign=al||'center';ctx.textBaseline='middle';ctx.fillText(s,x,y)};
+  T('ГАРАЖ НОМЕРОВ',N/2,104,'800 30px Unbounded,Onest,sans-serif','#c8f03c');
+  /* искры у редких */
+  if(p.rar>=3){
+    let sd=0;for(const ch of plateText(p))sd=(sd*31+ch.charCodeAt(0))>>>0;
+    const rnd=()=>{sd=(sd*1664525+1013904223)>>>0;return sd/4294967296};
+    ctx.save();ctx.fillStyle=col;
+    for(let i=0;i<(p.rar>=5?16:p.rar>=4?11:7);i++){
+      const sx=90+rnd()*(N-180),sy=230+rnd()*400,r=6+rnd()*11;
+      if(Math.abs(sy-440)<110&&sx>70&&sx<N-70)continue;
+      ctx.globalAlpha=.35+rnd()*.5;ctx.beginPath();ctx.moveTo(sx,sy-r);ctx.quadraticCurveTo(sx,sy,sx+r,sy);ctx.quadraticCurveTo(sx,sy,sx,sy+r);ctx.quadraticCurveTo(sx,sy,sx-r,sy);ctx.quadraticCurveTo(sx,sy,sx,sy-r);ctx.fill();
+    }
+    ctx.restore();
+  }
+  /* пол-отражение */
+  ctx.save();ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(N/2,596,400,24,0,0,7);ctx.fill();ctx.restore();
+  cvPlate(ctx,p,N/2,440,930);
+  /* редкость */
+  const rn=(RAR[p.rar]&&RAR[p.rar].n||'').toUpperCase();
+  ctx.font='700 32px Onest,sans-serif';const rw=ctx.measureText(rn).width+72;
+  ctx.save();rrect(ctx,N/2-rw/2,652,rw,64,32);ctx.fillStyle=`rgba(${rgb},.16)`;ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=3;ctx.stroke();ctx.restore();
+  T(rn,N/2,685,'700 32px Onest,sans-serif',col);
+  /* метки */
+  const tags=(p.tags||[]).slice(0,3);
+  if(tags.length){
+    ctx.font='600 26px Onest,sans-serif';const ws=tags.map(t=>ctx.measureText(t).width+40),tot=ws.reduce((a,b)=>a+b,0)+(tags.length-1)*14;let x=N/2-tot/2;
+    tags.forEach((t,i)=>{ctx.save();rrect(ctx,x,748,ws[i],46,23);ctx.fillStyle='rgba(255,255,255,.07)';ctx.fill();ctx.restore();T(t,x+ws[i]/2,772,'600 26px Onest,sans-serif','#c3cad9');x+=ws[i]+14});
+  }
+  /* страна и регион */
+  const cn=(C[p.c]&&C[p.c].name)||'',rg=p.regName||'',loc=rg?cn+' · '+rg:cn;
+  ctx.font='600 38px Onest,sans-serif';const lw=ctx.measureText(loc).width,fw=54,fh=36,tw=fw+16+lw,lx=N/2-tw/2;
+  cvFlag(ctx,p.c,lx,842,fw,fh);T(loc,lx+fw+16,861,'600 38px Onest,sans-serif','#eef1f7','left');
+  /* оценка */
+  const vs='Оценка '+fmt(p.v);ctx.font='800 46px Unbounded,Onest,sans-serif';const vw=ctx.measureText(vs).width,cw=46,vt=cw+18+vw,vx=N/2-vt/2;
+  ctx.save();ctx.beginPath();ctx.arc(vx+cw/2,934,cw/2,0,7);ctx.fillStyle='#fbbf24';ctx.fill();ctx.beginPath();ctx.arc(vx+cw/2,934,cw/2-8,0,7);ctx.strokeStyle='rgba(120,70,0,.55)';ctx.lineWidth=3;ctx.stroke();ctx.restore();
+  T(vs,vx+cw+18,935,'800 46px Unbounded,Onest,sans-serif','#ffd34d','left');
+  T('@'+BOT_USER+' · крути свои номера',N/2,1030,'500 26px Onest,sans-serif','#8a94a8');
+  const url=cv.toDataURL('image/jpeg',.9);
+  return url.slice(url.indexOf(',')+1);
+}
+let SHB=false;
+async function sharePlate(p){
+  if(SHB)return;SHB=true;hapI();
   const txt=`🚗 Мой номер ${plateText(p)} · ${C[p.c].name}\n${RAR[p.rar].n}, оценка ${fmt(p.v)} монет. Крути свои в «Гараже номеров»`;
-  openTg('https://t.me/share/url?url='+encodeURIComponent(refLink())+'&text='+encodeURIComponent(txt));
+  const asText=()=>openTg('https://t.me/share/url?url='+encodeURIComponent(refLink())+'&text='+encodeURIComponent(txt));
+  try{
+    toast('Готовлю картинку…');
+    let img;try{img=await plateCard(p)}catch(e){console.log('card',e);throw{error:'card'}}
+    const r=await api('POST','/api/share/prep',{img,text:txt});
+    let sent=false;
+    if(r.msg&&tg&&typeof tg.shareMessage==='function'&&(!tg.isVersionAtLeast||tg.isVersionAtLeast('8.0'))){
+      try{tg.shareMessage(r.msg,()=>{});sent=true}catch(e){}
+    }
+    if(!sent){
+      try{await api('POST','/api/share/send',{shot:r.shot,text:txt});toast('Картинка пришла в чат с ботом. Перешлите её друзьям')}
+      catch(e){if(e&&e.error==='nochat'){toast('Откройте бота и нажмите /start, тогда он пришлёт картинку')}else asText()}
+    }
+  }catch(e){asText()}
+  finally{SHB=false}
 }
 async function copyText(t){
   try{await navigator.clipboard.writeText(t);return true}catch(e){}
