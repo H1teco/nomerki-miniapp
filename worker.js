@@ -799,7 +799,7 @@ const TERMS=()=>`📄 <b>Условия покупки номеров на за�
 const PAYSUPPORT=()=>`🛟 <b>Поддержка платежей</b>
 
 Проблема с оплатой или номером? Напишите администратору: ${SUPPORT_HANDLE}. Укажите, что купили и во сколько. Помощь Telegram и поддержка Telegram по покупкам в этом боте не помогает: платежи решает только администратор игры.`;
-const SUPPORT_HANDLE='@LayerStudio';
+const SUPPORT_HANDLE='@hundiap';
 async function starsFulfil(env,from,sp,now){
   const o=await env.DB.prepare('SELECT id,user,k,pid,data,stars,st FROM orders WHERE id=?').bind(String(sp.invoice_payload||'')).first();
   const charge=String(sp.telegram_payment_charge_id||'');
