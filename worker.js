@@ -241,6 +241,7 @@ const DDL=[
  `CREATE TABLE IF NOT EXISTS promos(code TEXT PRIMARY KEY,coins INTEGER NOT NULL,max INTEGER NOT NULL DEFAULT 0,used INTEGER NOT NULL DEFAULT 0,expires INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 1,created INTEGER NOT NULL)`,
  `CREATE TABLE IF NOT EXISTS promo_uses(code TEXT NOT NULL,user INTEGER NOT NULL,at INTEGER NOT NULL,PRIMARY KEY(code,user))`,
  `CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY,v TEXT)`,
+ `CREATE TABLE IF NOT EXISTS bcm(id TEXT PRIMARY KEY,kind TEXT NOT NULL,fid TEXT NOT NULL,name TEXT,size INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL)`,
  `CREATE TABLE IF NOT EXISTS refs(user INTEGER PRIMARY KEY,ref INTEGER NOT NULL,at INTEGER NOT NULL,paid INTEGER NOT NULL DEFAULT 0)`,
  `CREATE INDEX IF NOT EXISTS refs_ref ON refs(ref,paid)`,
  `CREATE TABLE IF NOT EXISTS ach(user INTEGER NOT NULL,k TEXT NOT NULL,at INTEGER NOT NULL,claimed INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user,k))`,
@@ -386,6 +387,41 @@ async function notify(env,id,text){
     return !!(r&&r.ok);
   }catch(e){return false}
 }
+/* вложения в рассылке: файл один раз грузится в Telegram (в чат админа), дальше по file_id */
+const MEDIA={
+  photo:{m:'sendPhoto',k:'photo',pick:r=>r.photo&&r.photo.length?r.photo[r.photo.length-1].file_id:''},
+  video:{m:'sendVideo',k:'video',pick:r=>r.video?r.video.file_id:''},
+  animation:{m:'sendAnimation',k:'animation',pick:r=>(r.animation||r.document||{}).file_id||''},
+  audio:{m:'sendAudio',k:'audio',pick:r=>r.audio?r.audio.file_id:''},
+  document:{m:'sendDocument',k:'document',pick:r=>r.document?r.document.file_id:''}
+};
+const BC_MAX=20*1024*1024;
+function mediaKind(mime,size,asFile){
+  if(asFile)return 'document';
+  if(mime==='image/gif')return 'animation';
+  if(/^image\/(jpeg|png|webp)$/.test(mime))return size<=10*1024*1024?'photo':'document';
+  if(mime==='video/mp4')return 'video';
+  if(/^audio\/(mpeg|mp3|mp4|x-m4a|m4a)$/.test(mime))return 'audio';
+  return 'document';
+}
+async function tgUpload(env,method,fields,key,blob,fname){
+  const fd=new FormData();
+  for(const[k,v]of Object.entries(fields))fd.append(k,String(v));
+  fd.append(key,blob,fname);
+  const r=await fetch(`${TG(env)}/bot${env.BOT_TOKEN}/${method}`,{method:'POST',body:fd});
+  return r.json().catch(()=>({}));
+}
+async function notifyMedia(env,id,text,media){
+  try{
+    const M=MEDIA[media.kind]||MEDIA.document;
+    const body={chat_id:id,[M.k]:media.fid,parse_mode:'HTML',reply_markup:PLAY_KB()};
+    if(text)body.caption=text;
+    const r=await tgCall(env,M.m,body);
+    if(r&&r.ok===false&&(r.error_code===403||(r.error_code===400&&/chat not found|deactivated|blocked/i.test(String(r.description||'')))))await env.DB.prepare('UPDATE users SET notify=0 WHERE id=?').bind(id).run();
+    if(r&&r.ok===false)console.log('bc media',id,r.error_code,r.description);
+    return !!(r&&r.ok);
+  }catch(e){return false}
+}
 async function regRef(env,id,ref,now){
   if(!ref||ref===id)return;
   if(await env.DB.prepare('SELECT 1 FROM users WHERE id=?').bind(id).first())return;
@@ -469,10 +505,10 @@ async function maybeReminders(env){
   }
 }
 let bcBusy=0,gaBusy=0;
-async function sendBroadcast(env,ids,text){
+async function sendBroadcast(env,ids,text,media){
   let ok=0,bad=0;
   for(let i=0;i<ids.length;i+=20){
-    const res=await Promise.all(ids.slice(i,i+20).map(id=>notify(env,id,text)));
+    const res=await Promise.all(ids.slice(i,i+20).map(id=>media?notifyMedia(env,id,text,media):notify(env,id,text)));
     res.forEach(x=>x?ok++:bad++);
   }
   console.log('broadcast done',ok,bad);
@@ -1328,18 +1364,48 @@ const routes={
     const r=await env.DB.prepare(`SELECT COUNT(*) n,SUM(notify=1) r FROM users WHERE ${w}`).bind(...a).first();
     return{all:r.n,reach:r.r||0};
   },
+  async 'POST /api/admin/bc-upload'(env,u,url,now,req){
+    needAdmin(env,u);
+    if((+req.headers.get('content-length')||0)>BC_MAX)throw new HttpErr(413,'big');
+    const buf=await req.arrayBuffer();
+    if(!buf.byteLength)throw new HttpErr(400,'bad');
+    if(buf.byteLength>BC_MAX)throw new HttpErr(413,'big');
+    const name=String(url.searchParams.get('name')||'file').replace(/[\\/\r\n"]/g,'_').slice(0,100)||'file';
+    const mime=String(req.headers.get('content-type')||'application/octet-stream').split(';')[0].trim().toLowerCase();
+    let kind=mediaKind(mime,buf.byteLength,url.searchParams.get('as')==='1');
+    const blob=new Blob([buf],{type:mime});
+    let r=await tgUpload(env,MEDIA[kind].m,{chat_id:u.id,disable_notification:true},MEDIA[kind].k,blob,name);
+    if(r&&r.ok===false&&r.error_code===400&&kind!=='document'&&!/chat not found/i.test(String(r.description||''))){
+      kind='document';
+      r=await tgUpload(env,MEDIA.document.m,{chat_id:u.id,disable_notification:true},'document',blob,name);
+    }
+    if(!r||!r.ok){
+      console.log('bc upload fail',JSON.stringify(r));
+      throw new HttpErr(r&&(r.error_code===403||/chat not found/i.test(String(r.description||'')))?409:502,r&&(r.error_code===403||/chat not found/i.test(String(r.description||'')))?'nochat':'tgfail',{info:String(r&&r.description||'')});
+    }
+    const fid=MEDIA[kind].pick(r.result||{});
+    if(!fid)throw new HttpErr(502,'tgfail');
+    const id=uid();
+    await env.DB.batch([env.DB.prepare('DELETE FROM bcm WHERE created<?').bind(now-14*864e5),env.DB.prepare('INSERT INTO bcm(id,kind,fid,name,size,created) VALUES(?,?,?,?,?,?)').bind(id,kind,fid,name,buf.byteLength,now)]);
+    return{id,kind,name,size:buf.byteLength};
+  },
   async 'POST /api/admin/broadcast'(env,u,url,now,b){
     needAdmin(env,u);
-    const text=String(b.text||'').trim().slice(0,1500);
-    if(text.length<2)throw new HttpErr(400,'bad');
-    const body=esc(text);
-    if(b.test){const ok=await notify(env,u.id,body);return{sent:ok?1:0,test:true}}
+    let media=null;
+    if(b.media){
+      media=await env.DB.prepare('SELECT kind,fid FROM bcm WHERE id=?').bind(String(b.media)).first();
+      if(!media)throw new HttpErr(410,'gone');
+    }
+    const text=String(b.text||'').trim().slice(0,media?1024:1500);
+    if(text.length<2&&!media)throw new HttpErr(400,'bad');
+    const body=text?esc(text):'';
+    if(b.test){const ok=media?await notifyMedia(env,u.id,body,media):await notify(env,u.id,body);return{sent:ok?1:0,test:true}}
     if(bcBusy&&now-bcBusy<2e4)throw new HttpErr(429,'busy');
     const seg=segOf(b),[w,a]=segSql(seg,now);
     bcBusy=now;
     const ids=(await env.DB.prepare(`SELECT id FROM users WHERE notify=1 AND ${w}`).bind(...a).all()).results.map(r=>r.id);
-    bg(sendBroadcast(env,ids,body));
-    await logA(env,u,'broadcast',0,`${SEGS[seg]}: ${ids.length} · ${text.slice(0,80)}`);
+    bg(sendBroadcast(env,ids,body,media));
+    await logA(env,u,'broadcast',0,`${SEGS[seg]}: ${ids.length} · ${media?'📎'+media.kind+' ':''}${text.slice(0,80)}`);
     return{queued:ids.length};
   },
   async 'POST /api/admin/grant-all'(env,u,url,now,b){
@@ -1933,7 +1999,7 @@ export default{
       if(CFG.maint&&!isAdmin(env,u.id))throw new HttpErr(503,'maint',{text:CFG.maint});
       if(!(await isSub(env,u.id,now)))throw new HttpErr(403,'nosub',{url:CHANNEL_URL});
       let body={};
-      if(req.method==='POST'){try{const t=await req.text();body=t?JSON.parse(t):{}}catch(e){throw new HttpErr(400,'bad')}}
+      if(req.method==='POST'){if(key==='POST /api/admin/bc-upload')body=req;else try{const t=await req.text();body=t?JSON.parse(t):{}}catch(e){throw new HttpErr(400,'bad')}}
       return out(await fn(env,u,url,now,body));
     }catch(e){
       if(e instanceof HttpErr)return out({error:e.code,...e.extra},e.s);

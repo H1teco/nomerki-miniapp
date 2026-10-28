@@ -727,6 +727,11 @@ main{display:flex;flex-direction:column}
 .frc .frpr.st{color:#ffd34d}
 .frc .frpr .coin{width:13px;height:13px}
 .frc .cur{position:absolute;top:8px;right:8px;font:600 10px Onest,sans-serif;color:#0b0e14;background:var(--ac);border-radius:8px;padding:2px 6px}
+.bcf{display:flex;align-items:center;gap:10px;margin-top:10px}
+.bcf .btn{flex:none;height:42px;padding:0 14px;display:inline-flex;align-items:center;white-space:nowrap}
+.bcf .fn{flex:1;min-width:0;font-size:13px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bcf .fn b{color:var(--tx);font-weight:600}
+.bcf .fx{flex:none;width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--line);color:var(--tx);padding:0;font-size:16px;line-height:1}
 </style>
 </head>
 <body>
@@ -1181,7 +1186,7 @@ async function api(m,path,body){
   if(!r.ok){if(j.error==='nosub')showSub();if(j.error==='maint')showErr('Технические работы',j.text||'Скоро вернёмся',()=>boot());throw Object.assign({status:r.status},j,{error:j.error||'server'})}
   return j;
 }
-const ERR={coins:'Не хватает монет',framed:'С рамкой номер системе не сдать. Снимите рамку или выставьте номер на рынок',same:'Эта рамка уже стоит',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Не больше '+MAX_LOTS+' лотов',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nosub:'Нужна подписка на канал',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут',namewait:'Имя можно менять раз в 10 минут',badname:'Это имя нельзя использовать',badava:'Не подошло это фото, выберите другое',low:'Ставка уже перебита, обновил минимум',lead:'Вы уже лидируете',maint:'Идут технические работы',muted:'Вам закрыт доступ к рынку',bigamt:'Сумма больше лимита, нужно подтверждение',taken:'Такой номер уже выдан',bad_d:'Неверные цифры для этой страны',bad_l:'Неверные буквы для этой страны',bad_reg:'Такого региона нет',moved:'Номер уже сменил владельца',exists:'Такой код уже есть',busy:'Подождите несколько секунд',star:'Номер, купленный за ⭐, нельзя сдать системе. Выставьте его на рынок',toobig:'Слишком дорогой номер для покупки за ⭐',invoice:'Не удалось создать счёт. Попробуйте позже',lmax:'Сегодня больше билетов не купить',blocked:'Эта комбинация недоступна'};
+const ERR={coins:'Не хватает монет',big:'Файл больше 20 МБ',nochat:'Сначала откройте бота и нажмите /start: файл загружается через ваш чат с ботом',tgfail:'Telegram не принял файл',framed:'С рамкой номер системе не сдать. Снимите рамку или выставьте номер на рынок',same:'Эта рамка уже стоит',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Не больше '+MAX_LOTS+' лотов',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nosub:'Нужна подписка на канал',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут',namewait:'Имя можно менять раз в 10 минут',badname:'Это имя нельзя использовать',badava:'Не подошло это фото, выберите другое',low:'Ставка уже перебита, обновил минимум',lead:'Вы уже лидируете',maint:'Идут технические работы',muted:'Вам закрыт доступ к рынку',bigamt:'Сумма больше лимита, нужно подтверждение',taken:'Такой номер уже выдан',bad_d:'Неверные цифры для этой страны',bad_l:'Неверные буквы для этой страны',bad_reg:'Такого региона нет',moved:'Номер уже сменил владельца',exists:'Такой код уже есть',busy:'Подождите несколько секунд',star:'Номер, купленный за ⭐, нельзя сдать системе. Выставьте его на рынок',toobig:'Слишком дорогой номер для покупки за ⭐',invoice:'Не удалось создать счёт. Попробуйте позже',lmax:'Сегодня больше билетов не купить',blocked:'Эта комбинация недоступна'};
 const errToast=e=>{toast(ERR[e&&e.error]||'Ошибка');hapN('error')};
 const hoursLeft=ms=>{const m=Math.max(0,Math.ceil(ms/6e4));return m>=60?Math.ceil(m/60)+' ч':m+' мин'};
 const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return m>10&&m<15?c:k===1?a:k>1&&k<5?b:c};
@@ -2756,6 +2761,8 @@ async function adBc(tok){
     <div class="sec">Рассылка</div>
     <textarea class="bcta" id="bc-t" maxlength="1500" style="min-height:110px;margin-top:8px" placeholder="Текст сообщения. Придёт в личку бота."></textarea>
     <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--mut)"><span id="bc-c">0 / 1500</span></div>
+    <div class="bcf"><label class="btn sec2" for="bc-f" id="bc-fl">📎 Прикрепить файл</label><input type="file" id="bc-f" hidden><span class="fn" id="bc-fn"></span><button class="fx" id="bc-fx" style="display:none" aria-label="Убрать файл">×</button></div>
+    <label class="af chk"><input type="checkbox" id="bc-as">Отправить как файл, без сжатия (для фото и видео)</label>
     <button class="btn sec2 wide" id="bc-test" style="margin-top:8px;height:46px">Тест — отправить мне</button>
     <button class="btn gold wide" id="bc-go" style="margin-top:8px;height:48px">Отправить выбранным</button>
     <div class="sec">Раздача монет сегменту</div>
@@ -2775,20 +2782,56 @@ async function adBc(tok){
   loadAud();
   $('#ad-body').onclick=e=>{const p=e.target.closest('.apills button');if(!p)return;hapS();AD.seg=p.dataset.v;p.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===p));$('#bc-aud').textContent='Считаю получателей…';loadAud()};
   const t=$('#bc-t');
-  t.oninput=()=>{$('#bc-c').textContent=t.value.length+' / 1500'};
+  const BM={id:null,file:null,busy:false};
+  const lim=()=>BM.id||BM.busy?1024:1500;
+  const cnt=()=>{t.maxLength=lim();$('#bc-c').textContent=t.value.length+' / '+lim()+(BM.id?' · подпись к файлу':'')};
+  t.oninput=cnt;
+  const fnShow=txt=>{$('#bc-fn').innerHTML=txt;$('#bc-fx').style.display=BM.file?'':'none'};
+  const fmtSz=n=>n>=1048576?(n/1048576).toFixed(1)+' МБ':Math.max(1,Math.round(n/1024))+' КБ';
+  const KN={photo:'фото',video:'видео',animation:'анимация',audio:'аудио',document:'файл'};
+  const upload=async()=>{
+    const f=BM.file;if(!f)return;
+    BM.id=null;BM.busy=true;fnShow('Загружаю «'+esc(f.name)+'»…');
+    $('#bc-go').disabled=$('#bc-test').disabled=true;
+    let j={};
+    try{
+      const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),120000);
+      const r=await fetch(API+'/api/admin/bc-upload?name='+encodeURIComponent(f.name)+($('#bc-as').checked?'&as=1':''),{method:'POST',headers:{'x-init':(tg&&tg.initData)||'','content-type':f.type||'application/octet-stream'},body:f,signal:ctl.signal});
+      clearTimeout(to);
+      try{j=await r.json()}catch(e){}
+      if(!r.ok)j={error:j.error||'server'};
+    }catch(e){j={error:'net'}}
+    BM.busy=false;
+    if(!$('#bc-fn'))return;
+    $('#bc-go').disabled=$('#bc-test').disabled=false;
+    if(!j.id){BM.file=null;$('#bc-f').value='';fnShow('');errToast(j);cnt();return}
+    BM.id=j.id;
+    fnShow(`<b>${esc(j.name)}</b> · ${KN[j.kind]||'файл'} · ${fmtSz(j.size)}`);
+    if(t.value.length>1024){t.value=t.value.slice(0,1024);toast('Подпись к файлу обрезана до 1024 символов')}
+    cnt();hapN('success');toast('Файл загружен, копия пришла вам в бота');
+  };
+  $('#bc-f').onchange=e=>{
+    const f=e.target.files&&e.target.files[0];if(!f)return;
+    if(f.size>20*1024*1024){toast('Файл больше 20 МБ');hapN('error');e.target.value='';return}
+    if(!f.size){toast('Файл пустой');hapN('error');e.target.value='';return}
+    BM.file=f;upload();
+  };
+  $('#bc-as').onchange=()=>{if(BM.file&&!BM.busy)upload()};
+  $('#bc-fx').onclick=()=>{BM.file=null;BM.id=null;$('#bc-f').value='';fnShow('');cnt();hapS()};
+  const need=text=>text.length<2&&!BM.id;
   $('#bc-test').onclick=async()=>{
-    const text=t.value.trim();if(text.length<2){toast('Введите текст');hapN('error');return}
+    const text=t.value.trim();if(need(text)){toast('Введите текст или прикрепите файл');hapN('error');return}
     const b=$('#bc-test');b.disabled=true;
-    const r=await adDo('/api/admin/broadcast',{text,test:true});if(r){toast(r.sent?'Отправлено вам в бота':'Бот не смог отправить. Нажмите /start');hapN(r.sent?'success':'error')}
+    const r=await adDo('/api/admin/broadcast',{text,test:true,media:BM.id||undefined});if(r){toast(r.sent?'Отправлено вам в бота':'Бот не смог отправить. Нажмите /start');hapN(r.sent?'success':'error')}
     b.disabled=false;
   };
   $('#bc-go').onclick=async()=>{
-    const text=t.value.trim();if(text.length<2){toast('Введите текст');hapN('error');return}
+    const text=t.value.trim();if(need(text)){toast('Введите текст или прикрепите файл');hapN('error');return}
     const b=$('#bc-go');
     if(!arm(b,`Точно отправить ${fmt(aud.reach)} получателям?`))return;
     b.disabled=true;
-    const r=await adDo('/api/admin/broadcast',{text,seg:AD.seg});
-    if(r){toast('Рассылка запущена: '+fmt(r.queued)+' получателей');hapN('success');t.value='';$('#bc-c').textContent='0 / 1500'}
+    const r=await adDo('/api/admin/broadcast',{text,seg:AD.seg,media:BM.id||undefined});
+    if(r){toast('Рассылка запущена: '+fmt(r.queued)+' получателей');hapN('success');t.value='';BM.file=null;BM.id=null;$('#bc-f').value='';fnShow('');cnt()}
     b.disabled=false;b.textContent='Отправить выбранным';
   };
   $('#ga-go').onclick=async()=>{
