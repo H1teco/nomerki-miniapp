@@ -357,18 +357,20 @@ const avaOf=u=>u.av?`/api/ava/${u.id}?v=${u.av}`:(u.photo||'');
 const userOut=(u,env)=>({id:u.id,name:dnOf(u),tname:u.name,custom:!!(u.dname&&String(u.dname).trim()),hasAva:!!u.av,ava:avaOf(u),coins:u.coins,spins:u.spins,admin:isAdmin(env,u.id)});
 const REF_MAX=50;
 /* настройки, которые админ меняет из панели; хранятся в meta('cfg') и подтягиваются раз в 15 с */
-const CFG={prizes:[100000,50000,25000],refBonus:15000,refNew:5000,glimit:100000,refHoldN:5,alertThr:200000,maint:'',banner:null,sale:null,x2:null,t:0};
-const CFG_KEYS=['prizes','refBonus','refNew','glimit','refHoldN','alertThr','maint','banner','sale','x2'];
+const CFG={shopP:{},prizes:[100000,50000,25000],refBonus:15000,refNew:5000,glimit:100000,refHoldN:5,alertThr:200000,maint:'',banner:null,sale:null,x2:null,t:0};
+const CFG_KEYS=['shopP','prizes','refBonus','refNew','glimit','refHoldN','alertThr','maint','banner','sale','x2'];
 async function loadCfg(env,now,force){
   if(!force&&now-CFG.t<15000)return;CFG.t=now;
   try{
     const r=await env.DB.prepare("SELECT v FROM meta WHERE k='cfg'").first();
     if(r){const o=JSON.parse(r.v);CFG_KEYS.forEach(k=>{if(o[k]!==undefined)CFG[k]=o[k]})}
   }catch(e){console.log('cfg',e&&e.message)}
+  applyShopP();
 }
 async function saveCfg(env,patch,now){
   await loadCfg(env,now,true);
   CFG_KEYS.forEach(k=>{if(patch[k]!==undefined)CFG[k]=patch[k]});
+  applyShopP();
   const o={};CFG_KEYS.forEach(k=>{o[k]=CFG[k]});
   await env.DB.prepare("INSERT INTO meta(k,v) VALUES('cfg',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify(o)).run();
 }
@@ -905,6 +907,9 @@ const SHOP={
 };
 /* слоты лотов и аукционов временно закрыты для игроков: код и лимиты остаются, товары не показываются и не продаются */
 const SLOTS_ON=false,SLOT_KEYS=['bl','ba'];
+/* цены в звёздах можно менять из админки: переопределения лежат в CFG.shopP, стандартные цены — в SHOP_DEF */
+const SHOP_DEF=Object.fromEntries(Object.entries(SHOP).map(([k,v])=>[k,v.stars]));
+function applyShopP(){const o=CFG.shopP||{};for(const k of Object.keys(SHOP)){const v=Math.trunc(+o[k]);SHOP[k].stars=v>=1&&v<=10000?v:SHOP_DEF[k]}}
 const SR_W=[0,0,0,84,14,2];                       /* звёздная рулетка: эпичный / легендарный / мифический, % */
 const CS_BANDS=[[0,12e4,74],[12e4,25e4,21],[25e4,1e12,5]]; /* мифический кейс: по оценке номера, монет; шанс % */
 const CS_DG3=['001','002','003','005','007','100','111','222','333','444','555','666','777','888','999','123','700','500','099','199'];
@@ -1764,6 +1769,30 @@ const routes={
     await env.DB.prepare('INSERT INTO partners(code,name,pct,created) VALUES(?,?,?,?)').bind(code,name,pct,now).run();
     await logA(env,u,'partner-add',0,`${code} · ${name} · ${pct}%`);
     return{ok:true,code};
+  },
+  async 'GET /api/admin/shop-prices'(env,u,url,now){
+    needAdmin(env,u);
+    await loadCfg(env,now,true);
+    return{items:Object.keys(SHOP).filter(k=>SLOTS_ON||!SLOT_KEYS.includes(k)).map(k=>({id:k,k:SHOP[k].k,stars:SHOP[k].stars,def:SHOP_DEF[k]}))};
+  },
+  /* b.prices: {id: цена}; пустое значение или 0 сбрасывает товар на стандартную цену */
+  async 'POST /api/admin/shop-prices'(env,u,url,now,b){
+    needAdmin(env,u);
+    const pr=b.prices;if(!pr||typeof pr!=='object'||Array.isArray(pr))throw new HttpErr(400,'bad');
+    await loadCfg(env,now,true);
+    const nx={...(CFG.shopP||{})},info=[];
+    for(const[id,raw]of Object.entries(pr)){
+      if(!SHOP[id]||(!SLOTS_ON&&SLOT_KEYS.includes(id)))throw new HttpErr(400,'bad');
+      const was=SHOP[id].stars;
+      if(raw===null||raw===''||raw===0||raw==='0')delete nx[id];
+      else{const v=Math.trunc(+raw);if(!Number.isFinite(v)||v<1||v>10000)throw new HttpErr(400,'bad');if(v===SHOP_DEF[id])delete nx[id];else nx[id]=v}
+      const now_=nx[id]||SHOP_DEF[id];
+      if(now_!==was)info.push(`${id} ${was}→${now_}⭐`);
+    }
+    if(!info.length)return{ok:true,changed:0};
+    await saveCfg(env,{shopP:nx},now);
+    await logA(env,u,'shop-prices',0,info.join('; '));
+    return{ok:true,changed:info.length};
   },
   async 'POST /api/admin/partner-pay'(env,u,url,now,b){
     needAdmin(env,u);

@@ -499,6 +499,11 @@ main{display:flex;flex-direction:column}
 .wres b .coin{width:22px;height:22px}
 .apf{margin-top:14px;padding:14px;border-radius:20px;background:var(--card);border:1px solid var(--line)}
 .apf .asrch{margin-top:0}
+.prr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.prr:first-child{padding-top:0}
+.prr .n{min-width:0}.prr .n b{display:block;font-size:14px;font-weight:600}.prr .n small{display:block;margin-top:2px;font-size:11px;color:var(--mut)}
+.prr .f{display:flex;align-items:center;gap:6px;flex:none;color:#ffd34d;font-weight:700}
+.prr .f input{width:92px;height:44px;border-radius:14px;background:#0f1420;border:1px solid #2a3348;color:var(--tx);font:600 15px Onest,sans-serif;padding:0 10px;outline:0;text-align:right;-webkit-user-select:text;user-select:text}
 .apr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
 .apr label{display:block;font-size:11px;color:var(--mut);font-weight:600}
 .apr input{display:block;width:100%;min-width:0;margin-top:5px;height:44px;border-radius:14px;background:#0f1420;border:1px solid #2a3348;color:var(--tx);font:500 15px Onest,sans-serif;padding:0 10px;outline:0;-webkit-user-select:text;user-select:text}
@@ -2812,9 +2817,9 @@ function paintAdPromos(){
 /* ===== Stars: покупки и партнёры ===== */
 async function adStars(tok){
   try{
-    const[o,p]=await Promise.all([api('GET','/api/admin/orders'),api('GET','/api/admin/partners')]);
+    const[o,p,pr]=await Promise.all([api('GET','/api/admin/orders'),api('GET','/api/admin/partners'),api('GET','/api/admin/shop-prices')]);
     if(!live(tok))return;
-    AD.so=o;AD.sp=p.list;paintAdStars();
+    AD.so=o;AD.sp=p.list;AD.spr=pr.items;paintAdStars();
   }catch(e){adFail(e,()=>adTab('stars'))}
 }
 function partnerCard(p){
@@ -2825,10 +2830,37 @@ function partnerCard(p){
     <div class="t2" style="word-break:break-all"><span>${esc(p.link)}</span></div>
     <div class="t3"><button data-act="cl">Ссылка</button><button data-act="pp">Выплатил</button><button data-act="pe">Изменить</button></div></div>`;
 }
+const ADPL={p1:'Пакет 10 000 монет',p2:'Пакет 33 000 монет',p3:'Пакет 120 000 монет',p4:'Пакет 400 000 монет',sr1:'Звёздная рулетка ×1',sr5:'Звёздная рулетка ×5',cs:'Мифический кейс',bx:'Ускоритель ×2 на 7 дней',bl:'+5 слотов лотов',ba:'+2 слота аукционов'};
+function pricesBlock(){
+  const rows=(AD.spr||[]).map(x=>`<div class="prr" data-id="${esc(x.id)}"><div class="n"><b>${esc(ADPL[x.id]||x.id)}</b><small>${x.stars===x.def?'стандартная цена':'стандарт ⭐ '+x.def}</small></div><div class="f"><span>⭐</span><input inputmode="numeric" value="${x.stars}" data-def="${x.def}" data-was="${x.stars}" aria-label="Цена: ${esc(ADPL[x.id]||x.id)}"></div></div>`).join('');
+  return `<div class="sec" style="margin-top:6px">Цены в магазине</div>
+    <p class="hint" style="text-align:left;margin:6px 0 0">Цена в звёздах, от 1 до 10 000. Новая цена действует для новых счетов, уже открытые оплаты проходят по старой. Пустое поле или 0 вернёт стандартную цену.</p>
+    <div class="apf" id="pr-box">${rows}<button class="btn gold wide" id="pr-go" style="margin-top:12px;height:48px" disabled>Сохранить цены</button></div>`;
+}
+function bindPrices(){
+  const box=$('#pr-box');if(!box)return;
+  const ins=[...box.querySelectorAll('input')];
+  const dirty=()=>ins.some(i=>String(i.value).replace(/\D/g,'')!==i.dataset.was);
+  ins.forEach(i=>i.oninput=()=>{i.value=i.value.replace(/\D/g,'').slice(0,5);$('#pr-go').disabled=!dirty()});
+  $('#pr-go').onclick=async()=>{
+    const prices={};
+    for(const i of ins){
+      const v=String(i.value).replace(/\D/g,'');
+      if(v===i.dataset.was)continue;
+      const n=parseInt(v,10)||0;
+      if(n>10000){toast('Не больше ⭐ 10 000');hapN('error');i.focus();return}
+      prices[i.closest('.prr').dataset.id]=n;
+    }
+    if(!Object.keys(prices).length)return;
+    const b=$('#pr-go');b.disabled=true;
+    const r=await adDo('/api/admin/shop-prices',{prices},'Цены сохранены');
+    if(r)adTab('stars');else b.disabled=false;
+  };
+}
 function paintAdStars(){
   const o=AD.so,ps=AD.sp;
   const due=ps.reduce((a,p)=>a+Math.max(0,p.due),0);
-  $('#ad-body').innerHTML=`<div class="sec" style="margin-top:6px">Партнёры</div>
+  $('#ad-body').innerHTML=pricesBlock()+`<div class="sec" style="margin-top:18px">Партнёры</div>
     <p class="hint" style="text-align:left;margin:6px 0 0">Ссылка партнёра приводит игроков. Доля считается от Stars, которые эти игроки потратили. Возвращённые платежи в расчёт не входят. Деньги вы переводите сами, здесь только учёт.</p>
     <div class="apf"><div class="asrch"><input id="pt-name" placeholder="Имя партнёра (канал, блогер)" maxlength="40" autocomplete="off" aria-label="Имя партнёра"></div>
       <div class="apr"><label>Доля, %<input id="pt-pct" inputmode="numeric" value="25"></label><label>Код<input id="pt-code" maxlength="16" autocomplete="off" autocapitalize="none" placeholder="можно пусто"></label></div>
@@ -2837,6 +2869,7 @@ function paintAdStars(){
     <div id="pt-list">${ps.map(partnerCard).join('')||'<div class="empty" style="padding:22px">Пока нет ни одного.</div>'}</div>
     <div class="sec" style="margin-top:18px">Покупки за Stars · всего ⭐ ${fmt(o.stars)} · ${o.count} шт.</div>
     <div id="so-list">${o.list.map(x=>`<div class="au${x.st==='refunded'?' ban':''}" data-id="${esc(x.id)}"><div class="t1"><b>${esc(x.name||('ID '+x.user))}</b><span>⭐ ${x.stars}</span></div><div class="t2"><span>${esc(x.text)}</span><span>${shDate(x.at)}</span><span>${x.st==='refunded'?'возврат':'оплачено'}</span></div>${x.st==='paid'&&x.movable?`<div class="t3"><button class="dg" data-act="rf">Вернуть звёзды</button></div>`:''}</div>`).join('')||'<div class="empty" style="padding:22px">Покупок пока нет.</div>'}</div>`;
+  bindPrices();
   const n=id=>parseInt(String($(id).value).replace(/\D/g,''),10)||0;
   $('#pt-go').onclick=async()=>{
     const name=$('#pt-name').value.trim();
@@ -3389,7 +3422,7 @@ function paintShop(){
   const it=d.items,base=it.p1.coins/it.p1.stars;
   const csn=x=>`${(x/1000)|0}`;
   const cs=d.csBands;
-  const pk=SX_PK.map(k=>{const v=it[k],bonus=Math.round((v.coins/v.stars/base-1)*100);return `<button class="sx-c" data-i="${k}"><small>${bonus>0?'выгода +'+bonus+'%':'старт'}</small><b><i class="coin"></i>${fmt(v.coins)}</b><span class="pr">⭐ ${v.stars}</span></button>`}).join('');
+  const pk=SX_PK.map(k=>{const v=it[k],bonus=Math.round((v.coins/v.stars/base-1)*100);return `<button class="sx-c" data-i="${k}"><small>${bonus>0?'выгода +'+bonus+'%':k==='p1'?'старт':'&nbsp;'}</small><b><i class="coin"></i>${fmt(v.coins)}</b><span class="pr">⭐ ${v.stars}</span></button>`}).join('');
   const bxOn=d.bx>Date.now();
   const cpills=pills(Object.keys(d.regions).map(k=>[k,flag(k)+' '+k]),SH.c,'shc');
   $('#shop-body').innerHTML=`<h2 class="sx-h" style="margin:6px 0 0;font:700 24px Onest,sans-serif">Магазин</h2>
