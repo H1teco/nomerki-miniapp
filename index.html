@@ -1991,7 +1991,7 @@ $('#ov-pk').onclick=e=>{if(e.target.id==='ov-pk')hide('#ov-pk')};
 let SL=null;
 const QC=[['−10%',-.10],['−7% · быстро',-.07],['По оценке',0],['+10%',.10]];
 const AQ=[['Минимум',p=>slMin(p)],['−5%',p=>Math.max(slMin(p),nice(p.v*.95))],['По оценке',p=>p.v],['+20%',p=>nice(p.v*1.2)]];
-const slMin=p=>Math.max(100,Math.ceil(p.v*SELL)),slMax=p=>Math.ceil(p.v*3);
+const slMin=p=>p.rar>=4?1:Math.max(100,Math.ceil(p.v*SELL)),slMax=p=>p.rar>=4?999999999:Math.ceil(p.v*3);
 const slDef=(p,mode)=>mode==='auc'?Math.max(slMin(p),nice(p.v*.9)):nice(p.v*.93);
 function openSell(p,mode){
   mode=mode||(msub==='auc'?'auc':'fix');
@@ -2033,7 +2033,7 @@ function paintSell(reset){
   $('#sl-p').textContent=fmt(price);$('#sl-c').textContent=fmt(price-net);$('#sl-n').textContent=fmt(net);
   $('#sl-pin').classList.toggle('err',!okp&&price>0);
   const f=$('#sl-fine');f.classList.toggle('bad',!okp);
-  f.textContent=okp?(auc?'Побеждает самая высокая ставка. Не будет ставок — номер вернётся в гараж.':'Цена ниже оценки — купят быстрее. Лот висит 24 часа, потом вернётся в гараж.'):`Допустимая цена: от ${fmt(lo)} до ${fmt(hi)}`;
+  f.textContent=okp?(auc?'Побеждает самая высокая ставка. Не будет ставок — номер вернётся в гараж.':'Цена ниже оценки — купят быстрее. Лот висит 24 часа, потом вернётся в гараж.'):(p.rar>=4?'Укажите цену от 1 монеты':`Допустимая цена: от ${fmt(lo)} до ${fmt(hi)}`);
   const g=$('#sl-go');g.disabled=!okp||SL.busy;g.textContent=okp?(auc?'Запустить аукцион':'Выставить за '+fmt(price)):'Укажите цену';
   document.querySelectorAll('#sl-q .qc').forEach((b,i)=>{const v=auc?AQ[i][1](p):(QC[i][1]===0?p.v:nice(p.v*(1+QC[i][1])));b.classList.toggle('on',price===v)});
   document.querySelectorAll('#sl-h .qc').forEach(b=>b.classList.toggle('on',+b.dataset.h===SL.hours));

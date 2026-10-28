@@ -526,6 +526,8 @@ async function claimPlate(env,c,g,now){
   }
   throw new HttpErr(503,'exhausted');
 }
+/* границы цены лота/аукциона: у легендарных и мифических (rar>=4) ограничений нет, кроме разумного потолка */
+const priceRange=p=>p.rar>=4?[1,999999999]:[Math.max(100,Math.ceil(p.v*SELL)),Math.ceil(p.v*3)];
 const int=(x,lo,hi)=>{x=Math.floor(+x);if(!Number.isFinite(x)||x<lo||x>hi)throw new HttpErr(400,'bad');return x};
 
 
@@ -1599,7 +1601,7 @@ const routes={
     if(!AU_HOURS[hours])throw new HttpErr(400,'bad');
     const p=await env.DB.prepare("SELECT id,c,rar,v FROM plates WHERE id=? AND owner=? AND st='own'").bind(id,u.id).first();
     if(!p)throw new HttpErr(409,'gone');
-    const start=int(b.start,Math.max(100,Math.ceil(p.v*SELL)),Math.ceil(p.v*3));
+    const start=int(b.start,...priceRange(p));
     const cnt=(await env.DB.prepare("SELECT COUNT(*) n FROM auctions WHERE seller=? AND st='active'").bind(u.id).first()).n;
     if(cnt>=MAX_AUC)throw new HttpErr(409,'limit');
     const aid=uid(),ends=now+AU_HOURS[hours];
@@ -1787,7 +1789,7 @@ const routes={
     const id=String(b.plateId||'');
     const p=await env.DB.prepare("SELECT id,c,rar,v FROM plates WHERE id=? AND owner=? AND st='own'").bind(id,u.id).first();
     if(!p)throw new HttpErr(409,'gone');
-    const price=int(b.price,Math.max(100,Math.ceil(p.v*SELL)),Math.ceil(p.v*3));
+    const price=int(b.price,...priceRange(p));
     const cnt=(await env.DB.prepare("SELECT COUNT(*) n FROM lots WHERE seller=? AND st='active'").bind(u.id).first()).n;
     if(cnt>=MAX_LOTS)throw new HttpErr(409,'limit');
     const lid=uid();
