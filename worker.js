@@ -255,13 +255,16 @@ const DDL=[
  `CREATE TABLE IF NOT EXISTS quest(user INTEGER NOT NULL,day INTEGER NOT NULL,q TEXT NOT NULL,ev TEXT NOT NULL,g INTEGER NOT NULL,r INTEGER NOT NULL,p INTEGER NOT NULL DEFAULT 0,claimed INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user,day,q))`,
  `CREATE TABLE IF NOT EXISTS lotto(day INTEGER NOT NULL,user INTEGER NOT NULL,n INTEGER NOT NULL,PRIMARY KEY(day,user))`,
  `CREATE TABLE IF NOT EXISTS lotto_res(day INTEGER PRIMARY KEY,winner INTEGER NOT NULL,prize INTEGER NOT NULL,pool INTEGER NOT NULL,tickets INTEGER NOT NULL,players INTEGER NOT NULL,ts INTEGER NOT NULL)`,
+ `CREATE TABLE IF NOT EXISTS partners(code TEXT PRIMARY KEY,name TEXT NOT NULL,pct INTEGER NOT NULL DEFAULT 20,paid INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 1,created INTEGER NOT NULL)`,
+ `CREATE TABLE IF NOT EXISTS psrc(user INTEGER PRIMARY KEY,code TEXT NOT NULL,at INTEGER NOT NULL)`,
+ `CREATE INDEX IF NOT EXISTS psrc_code ON psrc(code)`,
  `CREATE TABLE IF NOT EXISTS resv(k TEXT PRIMARY KEY,oid TEXT NOT NULL,until INTEGER NOT NULL)`,
  `CREATE TABLE IF NOT EXISTS orders(id TEXT PRIMARY KEY,user INTEGER NOT NULL,k TEXT NOT NULL,pid TEXT NOT NULL,data TEXT NOT NULL,stars INTEGER NOT NULL,st TEXT NOT NULL DEFAULT 'new',charge TEXT,created INTEGER NOT NULL,paid_at INTEGER)`,
  `CREATE INDEX IF NOT EXISTS orders_user ON orders(user,st)`,
  `CREATE TABLE IF NOT EXISTS walert(id INTEGER PRIMARY KEY AUTOINCREMENT,ts INTEGER NOT NULL,user INTEGER NOT NULL,delta INTEGER NOT NULL,w_from INTEGER NOT NULL,w_to INTEGER NOT NULL,dt INTEGER NOT NULL,seen INTEGER NOT NULL DEFAULT 0)`
 ];
 let ready=null,lastClean=0;
-const MIG=['ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN streak INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN last_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wheel_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN notify INTEGER NOT NULL DEFAULT 1','ALTER TABLE users ADD COLUMN remind_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN dname TEXT','ALTER TABLE users ADD COLUMN photo TEXT','ALTER TABLE users ADD COLUMN avatar TEXT','ALTER TABLE users ADD COLUMN av INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN name_at INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN uname TEXT','ALTER TABLE users ADD COLUMN note TEXT','ALTER TABLE users ADD COLUMN mute INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN ban_reason TEXT','ALTER TABLE users ADD COLUMN csnap INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wsnap INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wsnap_at INTEGER NOT NULL DEFAULT 0','ALTER TABLE refs ADD COLUMN hold INTEGER NOT NULL DEFAULT 0','ALTER TABLE promos ADD COLUMN plate_rar INTEGER NOT NULL DEFAULT -1','ALTER TABLE promos ADD COLUMN plate_c TEXT','ALTER TABLE users ADD COLUMN pity TEXT'];
+const MIG=['ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN streak INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN last_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wheel_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN notify INTEGER NOT NULL DEFAULT 1','ALTER TABLE users ADD COLUMN remind_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN dname TEXT','ALTER TABLE users ADD COLUMN photo TEXT','ALTER TABLE users ADD COLUMN avatar TEXT','ALTER TABLE users ADD COLUMN av INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN name_at INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN uname TEXT','ALTER TABLE users ADD COLUMN note TEXT','ALTER TABLE users ADD COLUMN mute INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN ban_reason TEXT','ALTER TABLE users ADD COLUMN csnap INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wsnap INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wsnap_at INTEGER NOT NULL DEFAULT 0','ALTER TABLE refs ADD COLUMN hold INTEGER NOT NULL DEFAULT 0','ALTER TABLE promos ADD COLUMN plate_rar INTEGER NOT NULL DEFAULT -1','ALTER TABLE promos ADD COLUMN plate_c TEXT','ALTER TABLE users ADD COLUMN pity TEXT','ALTER TABLE users ADD COLUMN bx INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN xl INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN xa INTEGER NOT NULL DEFAULT 0'];
 /* одноразовая переоценка старых номеров по новой схеме (множители цифр × букв × региона) */
 function revalue(p){
   const c=p.c;if(!C[c]||!p.d)return null;
@@ -334,7 +337,7 @@ async function auth(req,env){
   return{id:u.id,name:nm,photo:ph,un};
 }
 async function getUser(env,a,now){
-  const SEL='SELECT id,name,coins,spins,bonus_at,banned,ban_reason,streak,last_day,wheel_day,dname,photo,av,name_at,uname,mute,pity FROM users WHERE id=?';
+  const SEL='SELECT id,name,coins,spins,bonus_at,banned,ban_reason,streak,last_day,wheel_day,dname,photo,av,name_at,uname,mute,pity,bx,xl,xa FROM users WHERE id=?';
   let u=await env.DB.prepare(SEL).bind(a.id).first();
   if(!u){
     await env.DB.prepare('INSERT OR IGNORE INTO users(id,name,coins,created,photo,uname) VALUES(?,?,?,?,?,?)').bind(a.id,a.name,START_COINS,now,a.photo,a.un).run();
@@ -371,7 +374,7 @@ async function saveCfg(env,patch,now){
 }
 const onSale=now=>CFG.sale&&CFG.sale.pct>0&&now<CFG.sale.until?CFG.sale:null;
 const onX2=now=>CFG.x2&&now<CFG.x2.until&&(CFG.x2.daily||CFG.x2.wheel)?CFG.x2:null;
-const x2m=(k,now)=>{const e=onX2(now);return e&&e[k]?2:1};
+const x2m=(k,now,u)=>{const e=onX2(now);return(e&&e[k])||(u&&u.bx>now)?2:1};
 const tierPrice=(T,i,now)=>{const sl=onSale(now);return sl&&sl.tiers.includes(i)?Math.max(1,Math.round(T.price*(100-sl.pct)/100)):T.price};
 const cfgOut=now=>({refBonus:CFG.refBonus,refNew:CFG.refNew,sale:onSale(now),x2:onX2(now)});
 const BOT_USER='LayerPlates_bot';
@@ -427,6 +430,11 @@ async function regRef(env,id,ref,now){
   if(await env.DB.prepare('SELECT 1 FROM users WHERE id=?').bind(id).first())return;
   if(!(await env.DB.prepare('SELECT 1 FROM users WHERE id=? AND banned=0').bind(ref).first()))return;
   await env.DB.prepare('INSERT OR IGNORE INTO refs(user,ref,at) VALUES(?,?,?)').bind(id,ref,now).run();
+}
+async function regPartner(env,id,code,now){
+  if(await env.DB.prepare('SELECT 1 FROM users WHERE id=?').bind(id).first())return;
+  if(!(await env.DB.prepare('SELECT 1 FROM partners WHERE code=? AND active=1').bind(code).first()))return;
+  await env.DB.prepare('INSERT OR IGNORE INTO psrc(user,code,at) VALUES(?,?,?)').bind(id,code,now).run();
 }
 async function payRef(env,u,refId,now){
   const cnt=(await env.DB.prepare('SELECT COUNT(*) n FROM refs WHERE ref=? AND paid=1').bind(refId).first()).n;
@@ -516,12 +524,12 @@ async function sendBroadcast(env,ids,text,media){
 let topCache={t:0,w:0,d:null};
 function dailyOf(u,now){
   const t=dayNum(now);
-  const m=x2m('daily',now),rw=m===1?REWARDS:REWARDS.map(x=>x*m);
+  const m=x2m('daily',now,u),rw=m===1?REWARDS:REWARDS.map(x=>x*m);
   if(u.last_day===t)return{rewards:rw,claimed:true,done:u.streak,next:null};
   const done=u.last_day===t-1?u.streak%7:0;
   return{rewards:rw,claimed:false,done,next:done+1};
 }
-const wheelOf=(u,now)=>({prizes:WHEEL.map(w=>w[0]*x2m('wheel',now)),available:u.wheel_day<dayNum(now)});
+const wheelOf=(u,now)=>({prizes:WHEEL.map(w=>w[0]*x2m('wheel',now,u)),available:u.wheel_day<dayNum(now)});
 function rnd100(){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296*100}
 function pickWheel(){let r=rnd100(),sum=WHEEL.reduce((a,w)=>a+w[1],0);r=r/100*sum;for(let i=0;i<WHEEL.length;i++){r-=WHEEL[i][1];if(r<0)return i}return WHEEL.length-1}
 const normCode=x=>String(x==null?'':x).trim().toUpperCase();
@@ -801,7 +809,7 @@ const STAR_DIV=60,STAR_MIN=25,STAR_MAX=10000,RESV_TTL=15*60e3;
 const starsOf=v=>Math.min(STAR_MAX,Math.max(STAR_MIN,Math.round(v/STAR_DIV/5)*5));
 /* рамки для номеров: косметика, хранится в data номера (fr), цена за монеты или за Stars */
 const FRAMES={brass:{n:'Латунь',coins:30000},chrome:{n:'Хром',coins:70000},neon:{n:'Неон',coins:150000},carbon:{n:'Карбон',stars:50},gold:{n:'Золото',stars:100},fire:{n:'Огонь',stars:150},ice:{n:'Лёд',stars:150}};
-const orderText=o=>{try{const d=JSON.parse(o.data);return d.fr?`рамка «${(FRAMES[d.fr]||{}).n||d.fr}» · ${d.t||''}`:plateText(d)}catch(e){return ''}};
+const orderText=o=>{try{const d=JSON.parse(o.data);return d.shop?shopText(d):d.fr?`рамка «${(FRAMES[d.fr]||{}).n||d.fr}» · ${d.t||''}`:plateText(d)}catch(e){return ''}};
 async function frameFulfil(env,o,od,charge,now){
   const res=await env.DB.batch([
     env.DB.prepare("UPDATE plates SET data=json_set(data,'$.fr',?,'$.frs',1) WHERE id=? AND owner=? AND st='own'").bind(od.fr,o.pid,o.user),
@@ -846,6 +854,7 @@ async function starsFulfil(env,from,sp,now){
   }
   if(o.st==='paid'||o.st==='refunded')return;
   const p=JSON.parse(o.data);
+  if(p.shop)return shopFulfil(env,o,p,charge,now);
   if(p.fr)return frameFulfil(env,o,p,charge,now);
   await plateTaken(env,p,now);
   const res=await env.DB.batch([
@@ -872,6 +881,7 @@ async function starsPreCheckout(env,q,now){
     if(o.st==='refunded')return bad('Заказ отменён.');
     const od=await env.DB.prepare('SELECT data,pid FROM orders WHERE id=?').bind(o.id).first();
     const odd=JSON.parse(od.data);
+    if(odd.shop)return tgCall(env,'answerPreCheckoutQuery',{pre_checkout_query_id:q.id,ok:true});
     if(odd.fr){
       const pl=await env.DB.prepare("SELECT data FROM plates WHERE id=? AND owner=? AND st='own'").bind(od.pid,o.user).first();
       if(!pl)return bad('Номер уже не в гараже или выставлен на продажу.');
@@ -884,6 +894,121 @@ async function starsPreCheckout(env,q,now){
     await env.DB.prepare("UPDATE resv SET oid=? WHERE k=?").bind(o.id,o.k).run();
     return tgCall(env,'answerPreCheckoutQuery',{pre_checkout_query_id:q.id,ok:true});
   }catch(e){console.log('precheckout',e&&e.message);return bad('Сервис временно недоступен. Попробуйте ещё раз.')}
+}
+
+/* магазин за Telegram Stars: пакеты монет, звёздная рулетка, ускорители, мифический кейс */
+const SHOP={
+  p1:{k:'pack',stars:50,coins:10000},p2:{k:'pack',stars:150,coins:33000},p3:{k:'pack',stars:500,coins:120000},p4:{k:'pack',stars:1500,coins:400000},
+  sr1:{k:'sr',stars:75,n:1},sr5:{k:'sr',stars:340,n:5},
+  bx:{k:'bx',stars:100,days:7},bl:{k:'bl',stars:80,add:5,cap:30},ba:{k:'ba',stars:60,add:2,cap:8},
+  cs:{k:'cs',stars:600}
+};
+const SR_W=[0,0,0,84,14,2];                       /* звёздная рулетка: эпичный / легендарный / мифический, % */
+const CS_BANDS=[[0,12e4,74],[12e4,25e4,21],[25e4,1e12,5]]; /* мифический кейс: по оценке номера, монет; шанс % */
+const CS_DG3=['001','002','003','005','007','100','111','222','333','444','555','666','777','888','999','123','700','500','099','199'];
+const CS_DG4=['0001','0002','0003','0005','0007','0100','0777','1000','1111','2222','3333','4444','5555','6666','7777','8888','9999','1234','0555','0999'];
+const ri=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n};
+function shopText(od){
+  const S=SHOP[od&&od.shop];if(!S)return'магазин';
+  if(S.k==='pack')return`пакет ${fmtN(S.coins)} монет`;
+  if(S.k==='sr')return`звёздная рулетка ×${S.n} · ${(C[od.c]||{}).name||''}`;
+  if(S.k==='bx')return`ускоритель ×2 на ${S.days} дн.`;
+  if(S.k==='bl')return`+${S.add} слотов лотов`;
+  if(S.k==='ba')return`+${S.add} слота аукционов`;
+  return`мифический кейс · ${(C[od.c]||{}).name||''}`;
+}
+function caseCands(c,band,n){
+  const four=c==='UA'||c==='BY',DG=four?CS_DG4:CS_DG3,m=CMB[c],Ls=[...(m.g3||[]),...(m.g4||[])],regs=C[c].reg,out=[];
+  for(let i=0;i<500&&out.length<n;i++){
+    const reg=regs[ri(regs.length)],d=DG[ri(DG.length)],L=c==='UA'?String(reg[0]):Ls[ri(Ls.length)];
+    let r;try{r=customPlate(c,d,L,String(reg[0]))}catch(e){continue}
+    const p=r.p;if(r.warn||p.rar!==5||p.v<band[0]||p.v>=band[1])continue;
+    out.push(p);
+  }
+  return out;
+}
+async function claimCase(env,c,now){
+  for(let b=wpick(CS_BANDS.map(x=>x[2]));b>=0;b--){
+    for(let round=0;round<3;round++){
+      const cands=caseCands(c,CS_BANDS[b],12);if(!cands.length)break;
+      const keys=cands.map(plateKey);
+      const taken=new Set((await env.DB.prepare(`SELECT k FROM issued WHERE k IN(${keys.map(()=>'?').join(',')})`).bind(...keys).all()).results.map(r=>r.k));
+      for(let i=0;i<cands.length;i++){
+        if(taken.has(keys[i]))continue;
+        const r=await env.DB.prepare('INSERT OR IGNORE INTO issued(k,ts) VALUES(?,?)').bind(keys[i],now).run();
+        if(r.meta.changes===1)return cands[i];
+        taken.add(keys[i]);
+      }
+    }
+  }
+  return await claimPlate(env,c,5,now);
+}
+async function shopFail(env,o,charge,now,msg){
+  const r=await tgCall(env,'refundStarPayment',{user_id:o.user,telegram_payment_charge_id:charge});
+  await env.DB.prepare("UPDATE orders SET st='refunded',charge=?,paid_at=? WHERE id=?").bind(charge,now,o.id).run();
+  bg(notify(env,o.user,r&&r.ok?`⭐ ${msg} Звёзды возвращены.`:`⭐ ${msg} Напишите /paysupport, мы вернём звёзды.`));
+}
+async function shopFulfil(env,o,od,charge,now){
+  const S=SHOP[od.shop];
+  if(!S)return shopFail(env,o,charge,now,'Товар не найден.');
+  const mark=env.DB.prepare("UPDATE orders SET st='paid',charge=?,paid_at=? WHERE id=? AND st IN('new','cancelled')").bind(charge,now,o.id);
+  if(S.k==='pack'||S.k==='bx'||S.k==='bl'||S.k==='ba'){
+    const up=S.k==='pack'?env.DB.prepare('UPDATE users SET coins=coins+? WHERE id=? AND (SELECT changes())=1').bind(S.coins,o.user)
+      :S.k==='bx'?env.DB.prepare('UPDATE users SET bx=MAX(bx,?)+? WHERE id=? AND (SELECT changes())=1').bind(now,S.days*DAY,o.user)
+      :S.k==='bl'?env.DB.prepare('UPDATE users SET xl=xl+? WHERE id=? AND (SELECT changes())=1').bind(S.add,o.user)
+      :env.DB.prepare('UPDATE users SET xa=xa+? WHERE id=? AND (SELECT changes())=1').bind(S.add,o.user);
+    const res=await env.DB.batch([mark,up]);
+    if(res[0].meta.changes!==1)return;
+    bg(notify(env,o.user,S.k==='pack'?`⭐ Оплата прошла. На счёт зачислено <b>+${fmtN(S.coins)}</b> монет.`:S.k==='bx'?`⭐ Оплата прошла. Ускоритель ×2 включён на ${S.days} дней: ежедневные награды и колесо удваиваются.`:S.k==='bl'?`⭐ Оплата прошла. Лимит лотов на рынке увеличен на ${S.add}.`:`⭐ Оплата прошла. Лимит аукционов увеличен на ${S.add}.`));
+    return;
+  }
+  const c=od.c,n=S.k==='sr'?S.n:1,plates=[];
+  try{
+    if(!C[c])throw new Error('bad c');
+    for(let i=0;i<n;i++){
+      const p=S.k==='cs'?await claimCase(env,c,now):await claimPlate(env,c,wpick(SR_W),now);
+      p.star=1;p.tags=[...(p.tags||[]),S.k==='cs'?'Мифический кейс':'Звёздная рулетка'];
+      plates.push(p);
+    }
+  }catch(e){
+    console.log('shop claim',e&&e.message);
+    await env.DB.batch(plates.map(p=>env.DB.prepare('DELETE FROM issued WHERE k=?').bind(plateKey(p))));
+    return shopFail(env,o,charge,now,'Не удалось выдать номера.');
+  }
+  const st=[mark];
+  for(const p of plates)st.push(env.DB.prepare("INSERT INTO plates(id,owner,st,c,rar,v,data,created) SELECT ?,?,'own',?,?,?,?,? WHERE (SELECT changes())=1").bind(p.id,o.user,p.c,p.rar,p.v,JSON.stringify(strip(p)),now));
+  st.push(env.DB.prepare("UPDATE orders SET data=json_set(data,'$.res',json(?)) WHERE id=? AND (SELECT changes())=1").bind(JSON.stringify(plates.map(p=>p.id)),o.id));
+  const res=await env.DB.batch(st);
+  if(res[0].meta.changes!==1){
+    await env.DB.batch(plates.map(p=>env.DB.prepare('DELETE FROM issued WHERE k=?').bind(plateKey(p))));
+    return;
+  }
+  bg(notify(env,o.user,`⭐ Оплата прошла. ${S.k==='cs'?'Из кейса выпало':'Выпало'}: ${plates.map(p=>'<b>'+esc(plateText(p))+'</b>').join(', ')}. Номера уже в гараже.`));
+  bg(achSync(env,{id:o.user},now));
+}
+
+async function shopRefund(env,u,o,od,now){
+  const S=SHOP[od.shop]||{};
+  const ids=(od.res||[]).map(String);
+  let rows=[];
+  if(ids.length){
+    rows=(await env.DB.prepare(`SELECT id,owner,data FROM plates WHERE id IN(${ids.map(()=>'?').join(',')})`).bind(...ids).all()).results;
+    if(rows.some(r=>r.owner!==o.user))throw new HttpErr(409,'moved');
+  }
+  const r=await tgCall(env,'refundStarPayment',{user_id:o.user,telegram_payment_charge_id:o.charge});
+  if(!r||!r.ok){console.log('refund fail',JSON.stringify(r));throw new HttpErr(502,'tgfail',{info:String(r&&r.description||'')})}
+  for(const x of rows){
+    await unlistPlate(env,x.id,now);
+    await env.DB.batch([env.DB.prepare('DELETE FROM plates WHERE id=?').bind(x.id),env.DB.prepare('DELETE FROM issued WHERE k=?').bind(plateKey(JSON.parse(x.data)))]);
+  }
+  if(S.k==='pack')await env.DB.prepare('UPDATE users SET coins=MAX(0,coins-?) WHERE id=?').bind(S.coins,o.user).run();
+  else if(S.k==='bx')await env.DB.prepare('UPDATE users SET bx=MAX(0,bx-?) WHERE id=?').bind(S.days*DAY,o.user).run();
+  else if(S.k==='bl')await env.DB.prepare('UPDATE users SET xl=MAX(0,xl-?) WHERE id=?').bind(S.add,o.user).run();
+  else if(S.k==='ba')await env.DB.prepare('UPDATE users SET xa=MAX(0,xa-?) WHERE id=?').bind(S.add,o.user).run();
+  await env.DB.prepare("UPDATE orders SET st='refunded' WHERE id=?").bind(o.id).run();
+  await logA(env,u,'order-refund',o.user,`${shopText(od)} · ${o.stars}⭐`);
+  bg(notify(env,o.user,`⭐ Покупка («${esc(shopText(od))}») отменена, ${o.stars} звёзд возвращены.`));
+  return{ok:true};
 }
 
 const needAdmin=(env,u)=>{if(!isAdmin(env,u.id))throw new HttpErr(403,'forbidden')};
@@ -1030,9 +1155,38 @@ const routes={
     return{url:inv.result,order:oid,stars:F.stars,text};
   },
   async 'GET /api/custom/order'(env,u,url,now){
-    const o=await env.DB.prepare('SELECT id,st,stars FROM orders WHERE id=? AND user=?').bind(String(url.searchParams.get('id')||''),u.id).first();
+    const o=await env.DB.prepare('SELECT id,st,stars,data FROM orders WHERE id=? AND user=?').bind(String(url.searchParams.get('id')||''),u.id).first();
     if(!o)throw new HttpErr(404,'gone');
-    return{st:o.st,stars:o.stars};
+    let plates=null;
+    if(o.st==='paid'){try{
+      const ids=(JSON.parse(o.data).res||[]).map(String).slice(0,10);
+      if(ids.length)plates=(await env.DB.prepare(`SELECT id,st,data,created FROM plates WHERE id IN(${ids.map(()=>'?').join(',')})`).bind(...ids).all()).results.map(plateOf).sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
+    }catch(e){}}
+    return{st:o.st,stars:o.stars,plates};
+  },
+
+  async 'GET /api/shop'(env,u,url,now){
+    return{items:Object.fromEntries(Object.entries(SHOP).map(([k,v])=>[k,{...v}])),srW:SR_W,csBands:CS_BANDS.map(b=>({from:b[0],to:b[1]>1e11?0:b[1],w:b[2]})),bx:u.bx>now?u.bx:0,xl:u.xl|0,xa:u.xa|0,lots:MAX_LOTS+(u.xl|0),auc:MAX_AUC+(u.xa|0),regions:Object.fromEntries(Object.entries(C).map(([k,v])=>[k,v.name]))};
+  },
+  async 'POST /api/shop/invoice'(env,u,url,now,b){
+    const id=String(b.item||''),S=SHOP[id];
+    if(!S)throw new HttpErr(400,'bad');
+    const od={shop:id};
+    if(S.k==='sr'||S.k==='cs'){const c=String(b.c||'');if(!C[c])throw new HttpErr(400,'bad');od.c=c}
+    if((S.k==='bl'&&(u.xl|0)>=S.cap)||(S.k==='ba'&&(u.xa|0)>=S.cap))throw new HttpErr(409,'max');
+    const recent=(await env.DB.prepare("SELECT COUNT(*) n FROM orders WHERE user=? AND k LIKE 'shop:%' AND st IN('new','cancelled') AND created>?").bind(u.id,now-6e4).first()).n;
+    if(recent>=8)throw new HttpErr(429,'slow');
+    await env.DB.prepare("UPDATE orders SET st='cancelled' WHERE user=? AND k LIKE 'shop:%' AND st='new'").bind(u.id).run();
+    const oid=uid(),text=shopText(od);
+    await env.DB.prepare("INSERT INTO orders(id,user,k,pid,data,stars,created) VALUES(?,?,?,?,?,?,?)").bind(oid,u.id,'shop:'+id,'',JSON.stringify(od),S.stars,now).run();
+    const desc=S.k==='pack'?`${fmtN(S.coins)} монет на ваш счёт. Зачислятся сразу после оплаты.`:S.k==='sr'?`${S.n} прокрут. звёздной рулетки: гарантированно эпичный номер или выше (${C[od.c].name}). Шансы показаны в игре.`:S.k==='bx'?`Ежедневные награды и колесо ×2 на ${S.days} дней.`:S.k==='bl'?`Больше лотов на рынке: +${S.add}. Навсегда.`:S.k==='ba'?`Больше аукционов одновременно: +${S.add}. Навсегда.`:`Один мифический номер (${C[od.c].name}) из топовых комбинаций. Шансы показаны в игре.`;
+    const inv=await tgCall(env,'createInvoiceLink',{title:text.charAt(0).toUpperCase().concat(text.slice(1)).slice(0,32),description:desc.slice(0,255),payload:oid,provider_token:'',currency:'XTR',prices:[{label:'Товар',amount:S.stars}]});
+    if(!inv||!inv.ok||typeof inv.result!=='string'){
+      console.log('shop invoice fail',JSON.stringify(inv));
+      await env.DB.prepare("UPDATE orders SET st='failed' WHERE id=?").bind(oid).run();
+      throw new HttpErr(502,'invoice');
+    }
+    return{url:inv.result,order:oid,stars:S.stars,text};
   },
 
   /* ---------- админка ---------- */
@@ -1556,12 +1710,13 @@ const routes={
     needAdmin(env,u);
     const rows=(await env.DB.prepare(`SELECT o.id,o.user,o.stars,o.st,o.created,o.paid_at,o.data,o.pid,${NAME_SQL('u')} name,(SELECT owner FROM plates WHERE id=o.pid) owner FROM orders o LEFT JOIN users u ON u.id=o.user WHERE o.st IN('paid','refunded') ORDER BY COALESCE(o.paid_at,o.created) DESC LIMIT 40`).all()).results;
     const sum=await env.DB.prepare("SELECT COALESCE(SUM(stars),0) s,COUNT(*) n FROM orders WHERE st='paid'").first();
-    return{list:rows.map(r=>({id:r.id,user:r.user,name:r.name||'',stars:r.stars,st:r.st,at:r.paid_at||r.created,text:orderText(r),movable:r.owner===r.user})),stars:sum.s,count:sum.n};
+    return{list:rows.map(r=>({id:r.id,user:r.user,name:r.name||'',stars:r.stars,st:r.st,at:r.paid_at||r.created,text:orderText(r),movable:r.owner===r.user||/"shop"/.test(r.data)})),stars:sum.s,count:sum.n};
   },
   async 'POST /api/admin/order-refund'(env,u,url,now,b){
     needAdmin(env,u);
     const o=await env.DB.prepare("SELECT id,user,k,pid,data,stars,st,charge FROM orders WHERE id=?").bind(String(b.id||'')).first();
     if(!o||o.st!=='paid'||!o.charge)throw new HttpErr(410,'gone');
+    {const od0=JSON.parse(o.data);if(od0.shop)return await shopRefund(env,u,o,od0,now)}
     const pl=await env.DB.prepare('SELECT owner FROM plates WHERE id=?').bind(o.pid).first();
     if(pl&&pl.owner!==o.user)throw new HttpErr(409,'moved');
     const r=await tgCall(env,'refundStarPayment',{user_id:o.user,telegram_payment_charge_id:o.charge});
@@ -1578,6 +1733,52 @@ const routes={
     await env.DB.batch([env.DB.prepare("UPDATE orders SET st='refunded' WHERE id=?").bind(o.id),env.DB.prepare('DELETE FROM issued WHERE k=?').bind(o.k)]);
     await logA(env,u,'order-refund',o.user,`${plateText(od)} · ${o.stars}⭐`);
     bg(notify(env,o.user,`⭐ Покупка номера <b>${esc(plateText(od))}</b> отменена, ${o.stars} звёзд возвращены.`));
+    return{ok:true};
+  },
+  async 'GET /api/admin/partners'(env,u,url,now){
+    needAdmin(env,u);
+    const rows=(await env.DB.prepare(`SELECT p.code,p.name,p.pct,p.paid,p.active,p.created,
+      (SELECT COUNT(*) FROM psrc s JOIN users x ON x.id=s.user WHERE s.code=p.code) players,
+      (SELECT COUNT(*) FROM psrc s JOIN users x ON x.id=s.user WHERE s.code=p.code AND x.seen>?) act7,
+      (SELECT COUNT(DISTINCT o.user) FROM orders o JOIN psrc s ON s.user=o.user WHERE s.code=p.code AND o.st='paid') payers,
+      (SELECT COALESCE(SUM(o.stars),0) FROM orders o JOIN psrc s ON s.user=o.user WHERE s.code=p.code AND o.st='paid') stars
+      FROM partners p ORDER BY p.created DESC LIMIT 200`).bind(now-7*DAY).all()).results;
+    return{list:rows.map(r=>({...r,share:Math.floor(r.stars*r.pct/100),due:Math.floor(r.stars*r.pct/100)-r.paid,link:`https://t.me/${BOT_USER}?start=p_${r.code}`}))};
+  },
+  async 'POST /api/admin/partner'(env,u,url,now,b){
+    needAdmin(env,u);
+    const name=String(b.name||'').trim().slice(0,40),pct=int(b.pct,0,90);
+    if(!name)throw new HttpErr(400,'bad');
+    let code=String(b.code||'').trim().toLowerCase();
+    if(code&&!/^[a-z0-9]{3,16}$/.test(code))throw new HttpErr(400,'bad');
+    const ex=code?await env.DB.prepare('SELECT 1 x FROM partners WHERE code=?').bind(code).first():null;
+    if(ex){
+      await env.DB.prepare('UPDATE partners SET name=?,pct=?,active=? WHERE code=?').bind(name,pct,b.active===false?0:1,code).run();
+      await logA(env,u,'partner-edit',0,`${code} · ${name} · ${pct}%${b.active===false?' · выкл':''}`);
+      return{ok:true,code};
+    }
+    if(!code){for(let i=0;i<5&&!code;i++){const c=Array.from({length:6},()=>'abcdefghjkmnpqrstuvwxyz23456789'[ri(31)]).join('');if(!(await env.DB.prepare('SELECT 1 x FROM partners WHERE code=?').bind(c).first()))code=c}}
+    if(!code)throw new HttpErr(500,'server');
+    await env.DB.prepare('INSERT INTO partners(code,name,pct,created) VALUES(?,?,?,?)').bind(code,name,pct,now).run();
+    await logA(env,u,'partner-add',0,`${code} · ${name} · ${pct}%`);
+    return{ok:true,code};
+  },
+  async 'POST /api/admin/partner-pay'(env,u,url,now,b){
+    needAdmin(env,u);
+    const code=String(b.code||''),amt=Math.trunc(+b.amount);
+    if(!Number.isFinite(amt)||amt===0||Math.abs(amt)>1e6)throw new HttpErr(400,'bad');
+    const r=await env.DB.prepare('UPDATE partners SET paid=paid+? WHERE code=?').bind(amt,code).run();
+    if(r.meta.changes!==1)throw new HttpErr(410,'gone');
+    await logA(env,u,'partner-pay',0,`${code} · ${amt>0?'+':''}${amt}⭐`);
+    return{ok:true};
+  },
+  async 'POST /api/admin/partner-del'(env,u,url,now,b){
+    needAdmin(env,u);
+    const code=String(b.code||'');
+    const r=await env.DB.prepare('DELETE FROM partners WHERE code=?').bind(code).run();
+    if(r.meta.changes!==1)throw new HttpErr(410,'gone');
+    await env.DB.prepare('DELETE FROM psrc WHERE code=?').bind(code).run();
+    await logA(env,u,'partner-del',0,code);
     return{ok:true};
   },
   async 'GET /api/admin/log'(env,u,url,now){
@@ -1659,7 +1860,7 @@ const routes={
     const row=r=>({id:r.id,st:r.st,start:r.start,bid:r.bidder?r.bid:0,bids:r.bids,min:aucMin(r),ends:r.ends,v:r.v,
       seller:{id:r.seller,name:r.sname,ava:avaOf({id:r.seller,av:r.sav,photo:r.sphoto})},leader:r.bidder?{id:r.bidder,name:r.bname}:null,
       mine:r.seller===u.id,leading:r.bidder===u.id,net:r.st==='sold'?Math.floor(r.bid*(100-COMM)/100):0,plate:{...JSON.parse(r.data),id:r.plate_id}});
-    return{list:act.map(row),done:done.map(row),now,max:MAX_AUC};
+    return{list:act.map(row),done:done.map(row),now,max:MAX_AUC+(u.xa|0)};
   },
   async 'POST /api/auction/create'(env,u,url,now,b){
     if(u.mute)throw new HttpErr(403,'muted');
@@ -1669,7 +1870,7 @@ const routes={
     if(!p)throw new HttpErr(409,'gone');
     const start=int(b.start,...priceRange(p));
     const cnt=(await env.DB.prepare("SELECT COUNT(*) n FROM auctions WHERE seller=? AND st='active'").bind(u.id).first()).n;
-    if(cnt>=MAX_AUC)throw new HttpErr(409,'limit');
+    if(cnt>=MAX_AUC+(u.xa|0))throw new HttpErr(409,'limit');
     const aid=uid(),ends=now+AU_HOURS[hours];
     const res=await env.DB.batch([
       env.DB.prepare("INSERT INTO auctions(id,plate_id,seller,start,created,ends,c,rar,v) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM plates WHERE id=? AND owner=? AND st='own')").bind(aid,id,u.id,start,now,ends,p.c,p.rar,p.v,id,u.id),
@@ -1741,7 +1942,7 @@ const routes={
     await achSync(env,u,now);
     const ar=(await env.DB.prepare('SELECT COUNT(*) n FROM ach WHERE user=? AND claimed=0').bind(u.id).first()).n;
     const ql=await qList(env,u.id,now);
-    return{refBonus,achReady:ar,pity:pityOf(u),pityN:PITY,qReady:ql.ready,cfg:cfgOut(now),banner:CFG.banner&&CFG.banner.text?CFG.banner:null,user:{...userOut(u,env),subWarn:isAdmin(env,u.id)&&subErr>0&&now-subErr<36e5},inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},daily:dailyOf(u,now),wheel:wheelOf(u,now),reset:dayEnd(now),now};
+    return{refBonus,achReady:ar,pity:pityOf(u),pityN:PITY,qReady:ql.ready,cfg:cfgOut(now),banner:CFG.banner&&CFG.banner.text?CFG.banner:null,user:{...userOut(u,env),subWarn:isAdmin(env,u.id)&&subErr>0&&now-subErr<36e5},inv:inv.results.map(plateOf),lots:lots.n,sales:{n:sales.n,net:sales.net},daily:dailyOf(u,now),wheel:wheelOf(u,now),lim:{lots:MAX_LOTS+(u.xl|0),auc:MAX_AUC+(u.xa|0)},bx:u.bx>now?u.bx:0,reset:dayEnd(now),now};
   },
   async 'POST /api/spin'(env,u,url,now,b){
     const c=String(b.c);if(!C[c])throw new HttpErr(400,'bad');
@@ -1800,7 +2001,7 @@ const routes={
   async 'POST /api/wheel'(env,u,url,now){
     const t=dayNum(now);
     if(u.wheel_day>=t)throw new HttpErr(429,'wait',{reset:dayEnd(now)});
-    const idx=pickWheel(),gain=WHEEL[idx][0]*x2m('wheel',now);
+    const idx=pickWheel(),gain=WHEEL[idx][0]*x2m('wheel',now,u);
     const r=await env.DB.prepare('UPDATE users SET coins=coins+?,wheel_day=? WHERE id=? AND wheel_day<?').bind(gain,t,u.id,t).run();
     if(r.meta.changes!==1)throw new HttpErr(429,'wait',{reset:dayEnd(now)});
     await qProg(env,u.id,'wheel',1,now);
@@ -1857,7 +2058,7 @@ const routes={
     if(!p)throw new HttpErr(409,'gone');
     const price=int(b.price,...priceRange(p));
     const cnt=(await env.DB.prepare("SELECT COUNT(*) n FROM lots WHERE seller=? AND st='active'").bind(u.id).first()).n;
-    if(cnt>=MAX_LOTS)throw new HttpErr(409,'limit');
+    if(cnt>=MAX_LOTS+(u.xl|0))throw new HttpErr(409,'limit');
     const lid=uid();
     const res=await env.DB.batch([
       env.DB.prepare("INSERT INTO lots(id,plate_id,seller,seller_name,price,created,expires,c,rar,v) SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM plates WHERE id=? AND owner=? AND st='own')").bind(lid,id,u.id,dnOf(u),price,now,now+LOT_TTL,p.c,p.rar,p.v,id,u.id),
@@ -1959,6 +2160,8 @@ async function onHook(req,env){
   if(m&&m.chat&&m.chat.type==='private'&&!(m.from&&m.from.is_bot)){
     const mm=/^\/start\s+ref_(\d{1,15})\b/.exec(String(m.text||''));
     if(mm){try{await regRef(env,m.from.id,+mm[1],Date.now())}catch(e){console.log('ref',e&&e.message)}}
+    const pm=/^\/start\s+p_([a-z0-9]{3,16})\b/i.exec(String(m.text||''));
+    if(pm){try{await regPartner(env,m.from.id,pm[1].toLowerCase(),Date.now())}catch(e){console.log('partner',e&&e.message)}}
     try{await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:WELCOME(),parse_mode:'HTML',disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:'🎮 Играть',web_app:{url:WEBAPP}}],[{text:'📣 Канал',url:CHANNEL_URL}]]}})}catch(e){console.log('TG',e&&e.message)}
   }
   return new Response('ok');
