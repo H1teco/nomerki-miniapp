@@ -761,6 +761,22 @@ async function settleLotto(env,now){
 const CHK=new Map();
 const STAR_DIV=60,STAR_MIN=25,STAR_MAX=10000,RESV_TTL=15*60e3;
 const starsOf=v=>Math.min(STAR_MAX,Math.max(STAR_MIN,Math.round(v/STAR_DIV/5)*5));
+/* рамки для номеров: косметика, хранится в data номера (fr), цена за монеты или за Stars */
+const FRAMES={brass:{n:'Латунь',coins:30000},chrome:{n:'Хром',coins:70000},neon:{n:'Неон',coins:150000},carbon:{n:'Карбон',stars:50},gold:{n:'Золото',stars:100},fire:{n:'Огонь',stars:150},ice:{n:'Лёд',stars:150}};
+const orderText=o=>{try{const d=JSON.parse(o.data);return d.fr?`рамка «${(FRAMES[d.fr]||{}).n||d.fr}» · ${d.t||''}`:plateText(d)}catch(e){return ''}};
+async function frameFulfil(env,o,od,charge,now){
+  const res=await env.DB.batch([
+    env.DB.prepare("UPDATE plates SET data=json_set(data,'$.fr',?,'$.frs',1) WHERE id=? AND owner=? AND st='own'").bind(od.fr,o.pid,o.user),
+    env.DB.prepare("UPDATE orders SET st='paid',charge=?,paid_at=? WHERE id=? AND st IN('new','cancelled') AND (SELECT changes())=1").bind(charge,now,o.id)
+  ]);
+  if(res[1].meta.changes!==1){
+    const r=await tgCall(env,'refundStarPayment',{user_id:o.user,telegram_payment_charge_id:charge});
+    await env.DB.prepare("UPDATE orders SET st='refunded',charge=?,paid_at=? WHERE id=?").bind(charge,now,o.id).run();
+    bg(notify(env,o.user,r&&r.ok?'⭐ Номер уже не в гараже или выставлен на продажу, рамку применить нельзя. Звёзды возвращены.':'⭐ Рамку применить не удалось. Напишите /paysupport, мы вернём звёзды.'));
+    return;
+  }
+  bg(notify(env,o.user,`⭐ Оплата прошла. Рамка «${(FRAMES[od.fr]||{}).n||''}» уже на номере <b>${esc(od.t||'')}</b>.`));
+}
 /* номер занят, только если он реально лежит у игрока; старые записи реестра без номера (проданные системе) не мешают */
 async function plateTaken(env,p,now){
   const k=plateKey(p);
@@ -792,6 +808,7 @@ async function starsFulfil(env,from,sp,now){
   }
   if(o.st==='paid'||o.st==='refunded')return;
   const p=JSON.parse(o.data);
+  if(p.fr)return frameFulfil(env,o,p,charge,now);
   await plateTaken(env,p,now);
   const res=await env.DB.batch([
     env.DB.prepare('INSERT OR IGNORE INTO issued(k,ts) VALUES(?,?)').bind(o.k,now),
@@ -815,8 +832,15 @@ async function starsPreCheckout(env,q,now){
     if(!o||o.user!==(q.from&&q.from.id)||o.stars!==q.total_amount||q.currency!=='XTR')return bad('Заказ не найден. Откройте покупку в игре заново.');
     if(o.st==='paid')return bad('Этот заказ уже оплачен.');
     if(o.st==='refunded')return bad('Заказ отменён.');
-    const od=await env.DB.prepare('SELECT data FROM orders WHERE id=?').bind(o.id).first();
-    if(await plateTaken(env,JSON.parse(od.data),now))return bad('Этот номер уже занят. Выберите другой.');
+    const od=await env.DB.prepare('SELECT data,pid FROM orders WHERE id=?').bind(o.id).first();
+    const odd=JSON.parse(od.data);
+    if(odd.fr){
+      const pl=await env.DB.prepare("SELECT data FROM plates WHERE id=? AND owner=? AND st='own'").bind(od.pid,o.user).first();
+      if(!pl)return bad('Номер уже не в гараже или выставлен на продажу.');
+      if((JSON.parse(pl.data).fr||'')===odd.fr)return bad('Эта рамка уже установлена.');
+      return tgCall(env,'answerPreCheckoutQuery',{pre_checkout_query_id:q.id,ok:true});
+    }
+    if(await plateTaken(env,odd,now))return bad('Этот номер уже занят. Выберите другой.');
     const r=await env.DB.prepare('INSERT INTO resv(k,oid,until) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET until=excluded.until WHERE resv.oid=excluded.oid OR resv.until<?').bind(o.k,o.id,now+RESV_TTL,now).run();
     if(r.meta.changes!==1)return bad('Этот номер сейчас оплачивает другой игрок.');
     await env.DB.prepare("UPDATE resv SET oid=? WHERE k=?").bind(o.id,o.k).run();
@@ -921,6 +945,51 @@ const routes={
       throw new HttpErr(502,'invoice');
     }
     return{url:inv.result,order:oid,stars,until:now+RESV_TTL,text};
+  },
+  async 'POST /api/frame/set'(env,u,url,now,b){
+    const id=String(b.plate||''),fr=String(b.frame||'');
+    const F=FRAMES[fr];
+    if(fr!=='none'&&!F)throw new HttpErr(400,'bad');
+    if(F&&!F.coins)throw new HttpErr(400,'bad');
+    const pl=await env.DB.prepare("SELECT data FROM plates WHERE id=? AND owner=? AND st='own'").bind(id,u.id).first();
+    if(!pl)throw new HttpErr(409,'gone');
+    const cur=JSON.parse(pl.data).fr||'';
+    if(fr==='none'){
+      if(!cur)throw new HttpErr(409,'same');
+      const r=await env.DB.prepare("UPDATE plates SET data=json_remove(data,'$.fr','$.frs') WHERE id=? AND owner=? AND st='own'").bind(id,u.id).run();
+      if(r.meta.changes!==1)throw new HttpErr(409,'gone');
+      return{coins:await coinsOf(env,u.id),fr:'',price:0};
+    }
+    if(cur===fr)throw new HttpErr(409,'same');
+    const res=await env.DB.batch([
+      env.DB.prepare("UPDATE users SET coins=coins-? WHERE id=? AND coins>=? AND EXISTS(SELECT 1 FROM plates WHERE id=? AND owner=? AND st='own' AND COALESCE(json_extract(data,'$.fr'),'')=?)").bind(F.coins,u.id,F.coins,id,u.id,cur),
+      env.DB.prepare("UPDATE plates SET data=json_remove(json_set(data,'$.fr',?),'$.frs') WHERE id=? AND owner=? AND st='own' AND (SELECT changes())=1").bind(fr,id,u.id)
+    ]);
+    if(res[1].meta.changes!==1){
+      const c=await coinsOf(env,u.id);
+      throw new HttpErr(c<F.coins?402:409,c<F.coins?'coins':'gone');
+    }
+    return{coins:await coinsOf(env,u.id),fr,price:F.coins};
+  },
+  async 'POST /api/frame/invoice'(env,u,url,now,b){
+    const id=String(b.plate||''),fr=String(b.frame||'');
+    const F=FRAMES[fr];
+    if(!F||!F.stars)throw new HttpErr(400,'bad');
+    const pl=await env.DB.prepare("SELECT data FROM plates WHERE id=? AND owner=? AND st='own'").bind(id,u.id).first();
+    if(!pl)throw new HttpErr(409,'gone');
+    const p=JSON.parse(pl.data);
+    if((p.fr||'')===fr)throw new HttpErr(409,'same');
+    const pend=(await env.DB.prepare("SELECT COUNT(*) n FROM orders WHERE user=? AND st='new' AND created>?").bind(u.id,now-36e5).first()).n;
+    if(pend>=10)throw new HttpErr(429,'slow');
+    const oid=uid(),text=plateText(p);
+    await env.DB.prepare("INSERT INTO orders(id,user,k,pid,data,stars,created) VALUES(?,?,?,?,?,?,?)").bind(oid,u.id,'fr:'+id,id,JSON.stringify({fr,t:text}),F.stars,now).run();
+    const inv=await tgCall(env,'createInvoiceLink',{title:`Рамка «${F.n}»`.slice(0,32),description:`Рамка «${F.n}» для номера ${text}. Применится сразу после оплаты.`.slice(0,255),payload:oid,provider_token:'',currency:'XTR',prices:[{label:'Рамка',amount:F.stars}]});
+    if(!inv||!inv.ok||typeof inv.result!=='string'){
+      console.log('frame invoice fail',JSON.stringify(inv));
+      await env.DB.prepare("UPDATE orders SET st='failed' WHERE id=?").bind(oid).run();
+      throw new HttpErr(502,'invoice');
+    }
+    return{url:inv.result,order:oid,stars:F.stars,text};
   },
   async 'GET /api/custom/order'(env,u,url,now){
     const o=await env.DB.prepare('SELECT id,st,stars FROM orders WHERE id=? AND user=?').bind(String(url.searchParams.get('id')||''),u.id).first();
@@ -1419,7 +1488,7 @@ const routes={
     needAdmin(env,u);
     const rows=(await env.DB.prepare(`SELECT o.id,o.user,o.stars,o.st,o.created,o.paid_at,o.data,o.pid,${NAME_SQL('u')} name,(SELECT owner FROM plates WHERE id=o.pid) owner FROM orders o LEFT JOIN users u ON u.id=o.user WHERE o.st IN('paid','refunded') ORDER BY COALESCE(o.paid_at,o.created) DESC LIMIT 40`).all()).results;
     const sum=await env.DB.prepare("SELECT COALESCE(SUM(stars),0) s,COUNT(*) n FROM orders WHERE st='paid'").first();
-    return{list:rows.map(r=>({id:r.id,user:r.user,name:r.name||'',stars:r.stars,st:r.st,at:r.paid_at||r.created,text:plateText(JSON.parse(r.data)),movable:r.owner===r.user})),stars:sum.s,count:sum.n};
+    return{list:rows.map(r=>({id:r.id,user:r.user,name:r.name||'',stars:r.stars,st:r.st,at:r.paid_at||r.created,text:orderText(r),movable:r.owner===r.user})),stars:sum.s,count:sum.n};
   },
   async 'POST /api/admin/order-refund'(env,u,url,now,b){
     needAdmin(env,u);
@@ -1429,10 +1498,18 @@ const routes={
     if(pl&&pl.owner!==o.user)throw new HttpErr(409,'moved');
     const r=await tgCall(env,'refundStarPayment',{user_id:o.user,telegram_payment_charge_id:o.charge});
     if(!r||!r.ok){console.log('refund fail',JSON.stringify(r));throw new HttpErr(502,'tgfail',{info:String(r&&r.description||'')})}
+    const od=JSON.parse(o.data);
+    if(od.fr){
+      if(pl)await env.DB.prepare("UPDATE plates SET data=json_remove(data,'$.fr','$.frs') WHERE id=? AND json_extract(data,'$.fr')=?").bind(o.pid,od.fr).run();
+      await env.DB.prepare("UPDATE orders SET st='refunded' WHERE id=?").bind(o.id).run();
+      await logA(env,u,'order-refund',o.user,`${orderText(o)} · ${o.stars}⭐`);
+      bg(notify(env,o.user,`⭐ Покупка рамки отменена, ${o.stars} звёзд возвращены.`));
+      return{ok:true};
+    }
     if(pl){await unlistPlate(env,o.pid,now);await env.DB.prepare('DELETE FROM plates WHERE id=?').bind(o.pid).run()}
     await env.DB.batch([env.DB.prepare("UPDATE orders SET st='refunded' WHERE id=?").bind(o.id),env.DB.prepare('DELETE FROM issued WHERE k=?').bind(o.k)]);
-    await logA(env,u,'order-refund',o.user,`${plateText(JSON.parse(o.data))} · ${o.stars}⭐`);
-    bg(notify(env,o.user,`⭐ Покупка номера <b>${esc(plateText(JSON.parse(o.data)))}</b> отменена, ${o.stars} звёзд возвращены.`));
+    await logA(env,u,'order-refund',o.user,`${plateText(od)} · ${o.stars}⭐`);
+    bg(notify(env,o.user,`⭐ Покупка номера <b>${esc(plateText(od))}</b> отменена, ${o.stars} звёзд возвращены.`));
     return{ok:true};
   },
   async 'GET /api/admin/log'(env,u,url,now){
@@ -1623,10 +1700,11 @@ const routes={
     const ids=[...new Set(Array.isArray(b.ids)?b.ids.map(String):[])].slice(0,60);
     if(!ids.length)throw new HttpErr(400,'bad');
     const q=ids.map(()=>'?').join(',');
-    const rows=(await env.DB.prepare(`SELECT id,v,data FROM plates WHERE owner=? AND st='own' AND COALESCE(json_extract(data,'$.star'),0)=0 AND id IN(${q})`).bind(u.id,...ids).all()).results;
+    const rows=(await env.DB.prepare(`SELECT id,v,data FROM plates WHERE owner=? AND st='own' AND COALESCE(json_extract(data,'$.star'),0)=0 AND COALESCE(json_extract(data,'$.fr'),'')='' AND id IN(${q})`).bind(u.id,...ids).all()).results;
     if(!rows.length){
       const sx=await env.DB.prepare(`SELECT 1 x FROM plates WHERE owner=? AND st='own' AND json_extract(data,'$.star')=1 AND id IN(${q})`).bind(u.id,...ids).first();
-      throw new HttpErr(409,sx?'star':'gone');
+      const fx=sx?null:await env.DB.prepare(`SELECT 1 x FROM plates WHERE owner=? AND st='own' AND COALESCE(json_extract(data,'$.fr'),'')!='' AND id IN(${q})`).bind(u.id,...ids).first();
+      throw new HttpErr(409,sx?'star':fx?'framed':'gone');
     }
     const st=[];
     for(const r of rows){

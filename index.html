@@ -705,6 +705,28 @@ main{display:flex;flex-direction:column}
 .cufine{margin:10px 2px 0;font-size:12px;color:var(--mut);line-height:1.5}
 .cufine b{color:var(--tx);font-weight:600}
 .cufine a{color:var(--ac);text-decoration:underline}
+/* v14: рамки для номеров */
+.pfr{display:flex;flex:none;position:relative;box-sizing:content-box;padding:.3em;border-radius:.55em;--fk:.9455}
+.pfr>.plate{font-size:calc(1em*var(--fk));box-shadow:none}
+.f-brass{padding:.42em;border-radius:.35em;--fk:.9236;background:linear-gradient(160deg,#d8b676 0%,#a9803f 45%,#d3ae6a 100%);box-shadow:0 .1em .5em rgba(0,0,0,.65),inset 0 0 0 .06em #6f5424}
+.f-brass>.plate{border-radius:.2em}
+.f-brass::before{content:'';position:absolute;inset:.12em;pointer-events:none;z-index:2;background:radial-gradient(circle,#fff0c4 0,#8a6a2c 55%,transparent 62%) left top/.2em .2em no-repeat,radial-gradient(circle,#fff0c4 0,#8a6a2c 55%,transparent 62%) right top/.2em .2em no-repeat,radial-gradient(circle,#fff0c4 0,#8a6a2c 55%,transparent 62%) left bottom/.2em .2em no-repeat,radial-gradient(circle,#fff0c4 0,#8a6a2c 55%,transparent 62%) right bottom/.2em .2em no-repeat}
+.f-chrome{background:linear-gradient(145deg,#f7f9fc 0%,#8e98a8 28%,#eef1f5 50%,#7b8493 74%,#e3e8ee 100%);box-shadow:0 .1em .5em rgba(0,0,0,.6),inset 0 0 0 .05em rgba(255,255,255,.6)}
+.f-neon{padding:.18em;border-radius:.45em;--fk:.9673;background:linear-gradient(100deg,#22d3ee,#c084fc 55%,#ff5d8f);box-shadow:0 0 .6em #22d3ee,0 0 1.6em rgba(192,132,252,.7),0 0 2.6em rgba(255,93,143,.35)}
+.f-carbon{padding:.32em;border-radius:.5em;--fk:.9418;background:repeating-linear-gradient(45deg,#16161a 0 .12em,#2b2b31 .12em .24em);box-shadow:0 .1em .5em rgba(0,0,0,.7),0 0 0 .07em #e11d48,0 0 .8em rgba(225,29,72,.45)}
+.f-gold{background:linear-gradient(145deg,#fff2a8 0%,#d9a516 26%,#fde58a 48%,#a87608 72%,#ffe58a 100%);box-shadow:0 0 .9em rgba(251,191,36,.55),0 .1em .5em rgba(0,0,0,.6),inset 0 0 0 .05em rgba(255,255,255,.55)}
+.f-fire{background:linear-gradient(135deg,#ff3d00 0%,#ff9100 45%,#ffd600 70%,#ff5a00 100%);box-shadow:0 0 .8em rgba(255,110,0,.75),0 0 2em rgba(255,61,0,.4),0 .1em .4em rgba(0,0,0,.6)}
+.f-ice{background:linear-gradient(160deg,#e0f2fe 0%,#7dd3fc 35%,#38bdf8 55%,#e0f2fe 100%);box-shadow:0 0 .9em rgba(56,189,248,.55),0 .1em .4em rgba(0,0,0,.6),inset 0 0 0 .06em rgba(255,255,255,.8)}
+.frprev{display:flex;justify-content:center;padding:26px 0 18px;margin-top:10px;border-radius:20px;background:radial-gradient(circle at 50% 40%,#1a2235,#0f1420)}
+.frgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.frc{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px 12px;border-radius:18px;background:var(--card);border:1.5px solid var(--line);color:var(--tx);font:600 14px Onest,sans-serif;text-align:center}
+.frc.sel{border-color:var(--ac)}
+.frc .frp{height:46px;display:flex;align-items:center;justify-content:center}
+.frc small{display:block;font:500 12px Onest,sans-serif;color:var(--mut)}
+.frc .frpr{font:600 13px Onest,sans-serif;color:var(--tx);display:flex;align-items:center;gap:4px}
+.frc .frpr.st{color:#ffd34d}
+.frc .frpr .coin{width:13px;height:13px}
+.frc .cur{position:absolute;top:8px;right:8px;font:600 10px Onest,sans-serif;color:#0b0e14;background:var(--ac);border-radius:8px;padding:2px 6px}
 </style>
 </head>
 <body>
@@ -856,6 +878,7 @@ main{display:flex;flex-direction:column}
 <div class="ov full" id="ov-ad"><div class="page" id="ad"></div></div>
 <div class="ov full" id="ov-rw"><div class="page" id="rw"></div></div>
 <div class="ov full" id="ov-cu"><div class="page" id="cu"></div></div>
+<div class="ov full" id="ov-fr"><div class="page" id="fr"></div></div>
 <div class="ov sheet" id="ov-pm"><div class="sh" id="pm"></div></div>
 <div class="ov sheet" id="ov-qs"><div class="sh" id="qs"></div></div>
 <div class="ov sheet" id="ov-cn"><div class="sh" id="cn"></div></div>
@@ -1120,8 +1143,13 @@ function plateHTML(p,size,shine){
   else if(p.c==='RU')h=`<div class="txt"><span class="lt">${p.l1}</span><span>${p.d}</span><span class="lt">${p.l2}</span></div><div class="reg"><b>${p.reg}</b><div class="rus"><small>RUS</small>${f('ru')}</div></div>`;
   else if(p.c==='UA')h=`<div class="band ua">${f('ua')}<b>UA</b></div><div class="txt"><span>${p.pre}</span><span>${p.d}</span><span>${p.suf}</span></div>`;
   else h=`<div class="band by">${f('by')}<b>BY</b></div><div class="txt"><span>${p.d}</span><span>${p.l}-${p.reg}</span></div>`;
+  const F=p.fr&&FR[p.fr];
+  if(F)return `<div class="pfr f-${p.fr}" style="font-size:${size}"><div class="plate ${p.c.toLowerCase()} r${p.rar}${shine&&p.rar>=3?' shine':''}">${h}</div></div>`;
   return `<div class="plate ${p.c.toLowerCase()} r${p.rar}${shine&&p.rar>=3?' shine':''}" style="font-size:${size}">${h}</div>`;
 }
+/* рамки: цены дублируют сервер (он списывает по своей таблице) */
+const FR={brass:{n:'Латунь',d:'Состаренная латунь с заклёпками.',coins:30000},chrome:{n:'Хром',d:'Полированный металл с холодным бликом.',coins:70000},neon:{n:'Неон',d:'Тонкая светящаяся линия, ночной город.',coins:150000},carbon:{n:'Карбон',d:'Карбоновое плетение с красной окантовкой.',stars:50},gold:{n:'Золото',d:'Золотая рама с мягким свечением.',stars:100},fire:{n:'Огонь',d:'Раскалённая рама с языками пламени.',stars:150},ice:{n:'Лёд',d:'Морозная рама с холодным сиянием.',stars:150}};
+const FR_ORDER=['none','brass','chrome','neon','carbon','gold','fire','ice'];
 
 /* ---------- состояние ---------- */
 /* адрес сервера игры (Cloudflare Worker) */
@@ -1153,7 +1181,7 @@ async function api(m,path,body){
   if(!r.ok){if(j.error==='nosub')showSub();if(j.error==='maint')showErr('Технические работы',j.text||'Скоро вернёмся',()=>boot());throw Object.assign({status:r.status},j,{error:j.error||'server'})}
   return j;
 }
-const ERR={coins:'Не хватает монет',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Не больше '+MAX_LOTS+' лотов',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nosub:'Нужна подписка на канал',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут',namewait:'Имя можно менять раз в 10 минут',badname:'Это имя нельзя использовать',badava:'Не подошло это фото, выберите другое',low:'Ставка уже перебита, обновил минимум',lead:'Вы уже лидируете',maint:'Идут технические работы',muted:'Вам закрыт доступ к рынку',bigamt:'Сумма больше лимита, нужно подтверждение',taken:'Такой номер уже выдан',bad_d:'Неверные цифры для этой страны',bad_l:'Неверные буквы для этой страны',bad_reg:'Такого региона нет',moved:'Номер уже сменил владельца',exists:'Такой код уже есть',busy:'Подождите несколько секунд',star:'Номер, купленный за ⭐, нельзя сдать системе. Выставьте его на рынок',toobig:'Слишком дорогой номер для покупки за ⭐',invoice:'Не удалось создать счёт. Попробуйте позже',lmax:'Сегодня больше билетов не купить',blocked:'Эта комбинация недоступна'};
+const ERR={coins:'Не хватает монет',framed:'С рамкой номер системе не сдать. Снимите рамку или выставьте номер на рынок',same:'Эта рамка уже стоит',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Не больше '+MAX_LOTS+' лотов',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nosub:'Нужна подписка на канал',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут',namewait:'Имя можно менять раз в 10 минут',badname:'Это имя нельзя использовать',badava:'Не подошло это фото, выберите другое',low:'Ставка уже перебита, обновил минимум',lead:'Вы уже лидируете',maint:'Идут технические работы',muted:'Вам закрыт доступ к рынку',bigamt:'Сумма больше лимита, нужно подтверждение',taken:'Такой номер уже выдан',bad_d:'Неверные цифры для этой страны',bad_l:'Неверные буквы для этой страны',bad_reg:'Такого региона нет',moved:'Номер уже сменил владельца',exists:'Такой код уже есть',busy:'Подождите несколько секунд',star:'Номер, купленный за ⭐, нельзя сдать системе. Выставьте его на рынок',toobig:'Слишком дорогой номер для покупки за ⭐',invoice:'Не удалось создать счёт. Попробуйте позже',lmax:'Сегодня больше билетов не купить',blocked:'Эта комбинация недоступна'};
 const errToast=e=>{toast(ERR[e&&e.error]||'Ошибка');hapN('error')};
 const hoursLeft=ms=>{const m=Math.max(0,Math.ceil(ms/6e4));return m>=60?Math.ceil(m/60)+' ч':m+' мин'};
 const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return m>10&&m<15?c:k===1?a:k>1&&k<5?b:c};
@@ -1800,7 +1828,7 @@ async function sellMany(ids){
 }
 $('#gb-sell').onclick=async e=>{
   const b=e.currentTarget;if(b.disabled)return;
-  const ids=S.inv.filter(p=>GSEL.has(p.id)&&p.st==='own'&&!p.star).map(p=>p.id);if(!ids.length){toast('Номера за ⭐ можно только продать игрокам');return}
+  const ids=S.inv.filter(p=>GSEL.has(p.id)&&p.st==='own'&&!p.star&&!p.fr).map(p=>p.id);if(!ids.length){toast('Номера за ⭐ и с рамкой системе не сдать, только игрокам');return}
   if(!arm(b,'Нажмите ещё раз для продажи')){hapS();return}
   b.disabled=true;
   const r=await sellMany(ids);
@@ -1826,7 +1854,7 @@ $('#gb-mk').onclick=async e=>{
 /* быстрая продажа пачкой */
 const QS_OPT=[[0,'Все обычные'],[1,'Обычные и необычные'],[2,'Всё до редких']];
 function openQuick(){
-  const own=S.inv.filter(p=>p.st==='own'&&!p.star);
+  const own=S.inv.filter(p=>p.st==='own'&&!p.star&&!p.fr);
   $('#qs').innerHTML=`<div class="grab"></div><h3>Быстрая продажа</h3>
     <p class="hint" style="margin-top:6px">Продаём системе за ${Math.round(SELL*100)}% оценки. Номера на рынке и эпичные и выше не трогаем.</p>`+
     QS_OPT.map(([m,l])=>{const a=own.filter(p=>p.rar<=m),sum=a.reduce((s,p)=>s+qs(p),0);return `<button class="btn qo" data-m="${m}" ${a.length?'':'disabled'}>${l}${a.length?` · ${a.length} шт · +${fmt(sum)}`:' · нет'}</button>`}).join('')+
@@ -1835,7 +1863,7 @@ function openQuick(){
   $('#qs').onclick=async e=>{
     const b=e.target.closest('.qo');if(!b||b.disabled)return;
     if(!arm(b,'Нажмите ещё раз, чтобы продать')){hapS();return}
-    const m=+b.dataset.m,ids=S.inv.filter(p=>p.st==='own'&&!p.star&&p.rar<=m).map(p=>p.id);
+    const m=+b.dataset.m,ids=S.inv.filter(p=>p.st==='own'&&!p.star&&!p.fr&&p.rar<=m).map(p=>p.id);
     hide('#ov-qs');
     const r=await sellMany(ids);
     if(r.n){toast(`Продано ${r.n} ${plural(r.n,'номер','номера','номеров')} · +${fmt(r.g)}`);hapN('success')}
@@ -1856,11 +1884,13 @@ function openSheet(id){
     <div class="where">${flag(p.c)} ${C[p.c].name} · ${p.regName}</div>
     <div class="est"><span>Оценка</span><i class="coin"></i><b>${fmt(p.v)}</b></div>
     <button class="btn gold wide" id="sh-mk">Выставить на рынок</button>
-    ${p.star?'':`<button class="btn wide" id="sh-sell">Продать быстро · ${fmt(qs(p))}</button>`}
+    <button class="btn wide" id="sh-fr">${p.fr&&FR[p.fr]?'Рамка «'+FR[p.fr].n+'» · сменить':'Рамка для номера'}</button>
+    ${p.star||p.fr?'':`<button class="btn wide" id="sh-sell">Продать быстро · ${fmt(qs(p))}</button>`}
     <button class="btn wide" id="sh-share">Поделиться номером</button>
     <button class="btn wide" id="sh-close">Закрыть</button>
-    <p class="hint">${p.star?'Номер куплен за ⭐, поэтому системе его не сдать. На рынке вы сами назначаете цену, комиссия '+COMM+'%.':`Быстрая продажа — ${Math.round(SELL*100)}% оценки. На рынке вы сами назначаете цену, комиссия ${COMM}%.`}</p>`;
+    <p class="hint">${p.star?'Номер куплен за ⭐, поэтому системе его не сдать. На рынке вы сами назначаете цену, комиссия '+COMM+'%.':p.fr?'С рамкой номер системе не сдать: снимите рамку или выставьте его на рынок. Комиссия рынка '+COMM+'%.':`Быстрая продажа — ${Math.round(SELL*100)}% оценки. На рынке вы сами назначаете цену, комиссия ${COMM}%.`}</p>`;
   $('#sh-mk').onclick=()=>{hide('#ov-sh');openSell(p)};
+  $('#sh-fr').onclick=()=>{hapI();hide('#ov-sh');openFrames(p)};
   if($('#sh-sell'))$('#sh-sell').onclick=()=>{hide('#ov-sh');sell(p)};
   $('#sh-close').onclick=()=>hide('#ov-sh');
   $('#sh-share').onclick=()=>sharePlate(p);
@@ -3112,6 +3142,78 @@ async function cuBuy(){
     if(tg&&tg.openInvoice)tg.openInvoice(inv.url,done);
     else{window.open(inv.url,'_blank');g.busy=false;toast('Откройте счёт в Telegram и оплатите');cuPrev()}
   }catch(e){g.busy=false;toast('Не удалось открыть оплату');cuPrev()}
+}
+
+/* ---------- рамки ---------- */
+const FRM={p:null,sel:'',busy:false};
+function frPrice(k){const f=FR[k];return !f?'Бесплатно':f.coins?`<i class="coin"></i>${fmt(f.coins)}`:`⭐ ${f.stars}`}
+function openFrames(p){
+  FRM.p=p;FRM.sel=p.fr||'none';FRM.busy=false;
+  $('#fr').innerHTML=`<div class="ph"><h2 style="font-size:22px">Рамка номера</h2><button class="xbtn" id="fr-x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
+    <p class="rwhint">Косметика: оценку номера не меняет. Видна на рынке, в аукционах, в гараже и профиле. Рамка принадлежит номеру и уходит вместе с ним при продаже.</p>
+    <div class="frprev" id="fr-pv"></div><div class="frgrid" id="fr-g"></div>
+    <button class="btn gold wide" id="fr-go" style="margin-top:14px;height:56px;border-radius:18px;font-size:16px"></button>
+    <p class="cufine">Рамка закрепляется за этим номером. Если смените её на другую, прежняя пропадёт, деньги не возвращаются. Номер с рамкой нельзя сдать системе за монеты, только продать игроку.</p>`;
+  $('#fr-x').onclick=()=>hide('#ov-fr');
+  $('#fr-g').onclick=e=>{const b=e.target.closest('.frc');if(!b||FRM.busy)return;hapS();FRM.sel=b.dataset.k;paintFrames()};
+  $('#fr-go').onclick=frGo;
+  paintFrames();show('#ov-fr');
+}
+function paintFrames(){
+  const p=FRM.p,cur=p.fr||'none',sel=FRM.sel;
+  $('#fr-pv').innerHTML=plateHTML({...p,fr:sel==='none'?'':sel},'min(30px,7.8vw)',true);
+  $('#fr-g').innerHTML=FR_ORDER.map(k=>{const f=FR[k];return `<button class="frc${k===sel?' sel':''}" data-k="${k}">${k===cur?'<span class="cur">Сейчас</span>':''}<div class="frp">${plateHTML({...p,fr:k==='none'?'':k},'9px')}</div><div>${k==='none'?'Без рамки':f.n}${f?`<small>${f.d}</small>`:'<small>Обычная чёрная окантовка</small>'}</div><div class="frpr${f&&f.stars?' st':''}">${frPrice(k)}</div></button>`}).join('');
+  const go=$('#fr-go'),f=FR[sel];
+  go.disabled=FRM.busy;
+  if(sel===cur){go.disabled=true;go.textContent=cur==='none'?'Рамка не установлена':'Эта рамка уже стоит'}
+  else if(sel==='none')go.textContent='Снять рамку';
+  else if(f.coins)go.textContent=S.coins<f.coins?`Не хватает монет · ${fmt(f.coins)}`:`Купить за ${fmt(f.coins)} монет`,go.disabled=go.disabled||S.coins<f.coins;
+  else go.textContent=`Купить за ⭐ ${f.stars}`;
+}
+async function frGo(){
+  const g=FRM,p=g.p,sel=g.sel,cur=p.fr||'none',go=$('#fr-go');
+  if(g.busy||sel===cur||go.disabled)return;
+  const f=FR[sel];
+  if(cur!=='none'&&!arm(go,sel==='none'?'Нажмите ещё раз: рамка пропадёт':'Нажмите ещё раз: прежняя рамка пропадёт')){hapS();return}
+  g.busy=true;go.disabled=true;
+  const fin=async msg=>{
+    g.busy=false;
+    const q=S.inv.find(x=>x.id===p.id);if(q){if(msg.fr)q.fr=msg.fr;else delete q.fr;g.p=q}
+    renderGarage();paintFrames();toast(msg.t);hapN('success');if(msg.fr)burst(3);
+  };
+  if(sel==='none'||f.coins){
+    go.textContent='…';
+    try{
+      const r=await api('POST','/api/frame/set',{plate:p.id,frame:sel});
+      S.coins=r.coins;setCoins(S.coins);paintHead();
+      await fin({fr:r.fr,t:r.fr?`Рамка «${FR[r.fr].n}» установлена`:'Рамка снята'});
+    }catch(e){g.busy=false;errToast(e);if(e&&e.error==='gone'){hide('#ov-fr');refreshMe();return}paintFrames()}
+    return;
+  }
+  go.textContent='Создаю счёт…';
+  let inv;
+  try{inv=await api('POST','/api/frame/invoice',{plate:p.id,frame:sel})}
+  catch(e){g.busy=false;errToast(e);if(e&&e.error==='gone'){hide('#ov-fr');refreshMe();return}paintFrames();return}
+  const done=async status=>{
+    if(status==='paid'||status==='pending'){
+      go.textContent='Проверяю оплату…';
+      let st='';
+      for(let i=0;i<20;i++){
+        try{st=(await api('GET','/api/custom/order?id='+inv.order)).st}catch(e){}
+        if(st==='paid'||st==='refunded')break;
+        await sleep(1000);
+      }
+      if(st==='paid'){await refreshMe();const q=S.inv.find(x=>x.id===p.id);g.busy=false;if(q)g.p=q;renderGarage();paintFrames();toast(`Рамка «${f.n}» установлена`);hapN('success');burst(4);return}
+      g.busy=false;
+      if(st==='refunded'){toast('Номер уже не в гараже. Звёзды вернутся');refreshMe();paintFrames();return}
+      toast('Оплата ещё обрабатывается. Рамка появится на номере, мы напишем в боте');refreshMe();paintFrames();return;
+    }
+    g.busy=false;toast(status==='cancelled'?'Оплата отменена':'Оплата не прошла');hapN('error');paintFrames();
+  };
+  try{
+    if(tg&&tg.openInvoice)tg.openInvoice(inv.url,done);
+    else{window.open(inv.url,'_blank');g.busy=false;toast('Откройте счёт в Telegram и оплатите');paintFrames()}
+  }catch(e){g.busy=false;toast('Не удалось открыть оплату');paintFrames()}
 }
 $('#p-custom').onclick=()=>{hapI();openCustom()};
 $('#p-check').onclick=()=>{hapI();openCustom('check')};
