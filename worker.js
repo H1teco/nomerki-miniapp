@@ -758,6 +758,7 @@ async function settleLotto(env,now){
   await env.DB.prepare('DELETE FROM lotto WHERE day<?').bind(day-30).run();
 }
 /* номера на заказ за Telegram Stars */
+const CHK=new Map();
 const STAR_DIV=60,STAR_MIN=25,STAR_MAX=10000,RESV_TTL=15*60e3;
 const starsOf=v=>Math.min(STAR_MAX,Math.max(STAR_MIN,Math.round(v/STAR_DIV/5)*5));
 /* номер занят, только если он реально лежит у игрока; старые записи реестра без номера (проданные системе) не мешают */
@@ -874,6 +875,29 @@ const routes={
     const busy=!!(rv&&rv.until>now);
     const{id,...pl}=p;
     return{plate:{...pl,id:'preview'},text:plateText(p),stars,taken,busy,blocked:!!warn,toobig:false,max:STAR_MAX};
+  },
+  /* проверка номера: свободен ли, у кого, на рынке ли */
+  async 'POST /api/plate/check'(env,u,url,now,b){
+    const w=CHK.get(u.id)||[];const rec=w.filter(t=>now-t<60e3);
+    if(rec.length>=40)throw new HttpErr(429,'slow');
+    rec.push(now);CHK.set(u.id,rec);if(CHK.size>3000)CHK.clear();
+    const base=await routes['POST /api/custom/preview'](env,u,url,now,b);
+    const{p}=customPlate(String(b.c),b.d,b.l,b.reg);
+    let state='free',owner=null,market=null;
+    if(base.blocked)state='blocked';
+    else{
+      const own=await plateOwnerByKey(env,p);
+      if(own){
+        state=own.owner===u.id?'mine':'taken';
+        if(state==='taken')owner={id:own.owner,name:await nmOf(env,own.owner)};
+        if(own.st==='listed'){
+          const lot=await env.DB.prepare("SELECT price FROM lots WHERE plate_id=? AND st='active'").bind(own.id).first();
+          if(lot)market={kind:'lot',price:lot.price};
+          else{const au=await env.DB.prepare("SELECT bid,start,ends FROM auctions WHERE plate_id=? AND st='active'").bind(own.id).first();if(au)market={kind:'auc',price:au.bid||au.start,ends:au.ends}}
+        }
+      }else if(base.taken||base.busy)state='busy';
+    }
+    return{...base,state,owner,market};
   },
   async 'POST /api/custom/invoice'(env,u,url,now,b){
     const{p,warn}=customPlate(String(b.c),b.d,b.l,b.reg);

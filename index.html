@@ -781,6 +781,7 @@ main{display:flex;flex-direction:column}
       <button class="btn pbtn" id="p-ach"><span>Достижения<i class="dot" id="p-ach-d" hidden></i></span><span id="p-ach-l" style="color:var(--mut);font-size:13px">Награды</span></button>
       <button class="btn pbtn" id="p-top"><span>Рейтинг игроков</span><span style="color:var(--mut);font-size:13px">Топ</span></button>
       <button class="btn pbtn" id="p-ref"><span>Пригласить друзей</span><span style="color:var(--ac);font-size:13px" id="p-ref-b">+15 000 за друга</span></button>
+      <button class="btn pbtn" id="p-check"><span>Проверить номер</span><span style="color:var(--mut);font-size:13px">Свободен или нет</span></button>
       <button class="btn pbtn" id="p-custom"><span>Номер на заказ</span><span style="color:#ffd34d;font-size:13px">⭐ Stars</span></button>
       <button class="btn pbtn" id="p-promo"><span>Промокод</span><span style="color:var(--mut);font-size:13px">Ввести</span></button>
       <button class="btn pbtn" id="p-admin" style="display:none"><span>Админ-панель</span><span style="color:var(--mut);font-size:13px">Открыть</span></button>
@@ -789,7 +790,8 @@ main{display:flex;flex-direction:column}
     <section class="tab" id="t-market">
       <div class="head">
         <h2>Рынок</h2>
-        <button class="refresh" id="m-refresh" aria-label="Обновить"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+        <span style="display:flex;gap:8px"><button class="refresh" id="m-check" aria-label="Проверить номер"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
+        <button class="refresh" id="m-refresh" aria-label="Обновить"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button></span>
       </div>
       <div class="mtop" style="margin-top:10px">
         <div class="seg2" role="tablist" aria-label="Раздел рынка">
@@ -3029,10 +3031,10 @@ $('#p-daily').onclick=()=>{hapI();openRewards()};
 $('#p-promo').onclick=()=>{hapI();openPromo()};
 /* ---------- номер на заказ за Telegram Stars ---------- */
 const CU={c:'KZ',d:'',l:'',reg:'',x:null,busy:false,tm:0};
-function openCustom(){
-  CU.x=null;CU.busy=false;
-  $('#cu').innerHTML=`<div class="ph"><h2 style="font-size:22px">Номер на заказ</h2><button class="xbtn" id="cu-x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
-    <p class="rwhint">Соберите свой номер: выберите страну, цифры, буквы и регион. Цена в ⭐ зависит от качества и комбинации. Платёж проходит через Telegram Stars, номер сразу попадает в гараж.</p>
+function openCustom(mode){
+  CU.x=null;CU.busy=false;const chk=mode==='check';
+  $('#cu').innerHTML=`<div class="ph"><h2 style="font-size:22px">${chk?'Проверка номера':'Номер на заказ'}</h2><button class="xbtn" id="cu-x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
+    <p class="rwhint">${chk?'Введите цифры, буквы и регион: покажем, свободен ли номер, у кого он и на рынке ли. Свободный можно сразу заказать за ⭐.':'Соберите свой номер: выберите страну, цифры, буквы и регион. Цена в ⭐ зависит от качества и комбинации. Платёж проходит через Telegram Stars, номер сразу попадает в гараж.'}</p>
     <div id="cu-f"></div>`;
   $('#cu-x').onclick=()=>hide('#ov-cu');
   cuForm();show('#ov-cu');
@@ -3067,15 +3069,16 @@ async function cuPrev(){
   if(g.d.length!==sp.n||[...g.l].length!==sp.nl||!g.reg){box.innerHTML='';go.disabled=true;go.textContent='Выберите номер';return}
   const stamp=g.c+g.d+g.l+g.reg;
   try{
-    const x=await api('POST','/api/custom/preview',{c:g.c,d:g.d,l:g.l,reg:g.reg});
+    const x=await api('POST','/api/plate/check',{c:g.c,d:g.d,l:g.l,reg:g.reg});
     if(stamp!==g.c+g.d+g.l+g.reg||!$('#cu-pv'))return;
-    g.x=x;const p=x.plate,bad=x.taken?'Этот номер уже занят':x.blocked?'Эта комбинация недоступна':x.toobig?`Слишком дорогой номер: максимум ${fmt(x.max)} ⭐`:x.busy?'Этот номер сейчас оплачивает другой игрок':'';
+    g.x=x;const p=x.plate,mk=x.market?(x.market.kind==='lot'?` · на рынке за ${fmt(x.market.price)} монет`:` · на аукционе, ставка ${fmt(x.market.price)}`):'';
+    const bad=x.state==='taken'?`Занят: игрок ${esc((x.owner&&x.owner.name)||'?')}${mk}`:x.state==='mine'?`Этот номер уже у вас${mk}`:x.state==='busy'?'Номер сейчас оформляется другим игроком':x.state==='blocked'?'Эта комбинация недоступна':'';
     box.innerHTML=`<div class="pv r${p.rar}"><div class="pvp">${plateHTML(p,'15px',1)}</div>
       <div class="t2" style="justify-content:center"><span>Редкость <i style="color:${RCOL[p.rar]}">${RAR[p.rar].n}</i></span><span>Оценка <i>${fmt(p.v)}</i></span></div>
       <div class="t2" style="justify-content:center"><span>Цифры ×<i>${p.mx[0]}</i></span><span>Буквы ×<i>${p.mx[1]}</i></span><span>Регион ×<i>${p.mx[2]}</i></span></div>
       ${(p.tags||[]).length?`<div class="t2" style="justify-content:center"><span>${p.tags.map(esc).join(' · ')}</span></div>`:''}
-      ${bad?`<div class="abn warn" style="margin-top:8px">${bad}</div>`:`<div class="cuprice">⭐ ${fmt(x.stars)}</div>`}</div>`;
-    go.disabled=!!bad||CU.busy;go.textContent=bad?'Недоступно':`Купить за ⭐ ${fmt(x.stars)}`;
+      ${bad?`<div class="abn warn" style="margin-top:8px">${bad}</div>`:`<div class="abn ok" style="margin-top:8px">Номер свободен</div><div class="cuprice">⭐ ${fmt(x.stars)}</div>`}</div>`;
+    go.disabled=!!bad||CU.busy;go.textContent=bad?'Заказать нельзя':`Заказать за ⭐ ${fmt(x.stars)}`;
   }catch(e){box.innerHTML=`<div class="abn warn" style="margin-top:8px">${esc(ERR[e&&e.error]||'Ошибка')}</div>`;go.disabled=true}
 }
 async function cuBuy(){
@@ -3111,6 +3114,8 @@ async function cuBuy(){
   }catch(e){g.busy=false;toast('Не удалось открыть оплату');cuPrev()}
 }
 $('#p-custom').onclick=()=>{hapI();openCustom()};
+$('#p-check').onclick=()=>{hapI();openCustom('check')};
+$('#m-check').onclick=()=>{hapI();openCustom('check')};
 
 function go(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id==='t-'+name));
