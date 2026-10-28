@@ -903,6 +903,8 @@ const SHOP={
   bx:{k:'bx',stars:100,days:7},bl:{k:'bl',stars:80,add:5,cap:30},ba:{k:'ba',stars:60,add:2,cap:8},
   cs:{k:'cs',stars:600}
 };
+/* слоты лотов и аукционов временно закрыты для игроков: код и лимиты остаются, товары не показываются и не продаются */
+const SLOTS_ON=false,SLOT_KEYS=['bl','ba'];
 const SR_W=[0,0,0,84,14,2];                       /* звёздная рулетка: эпичный / легендарный / мифический, % */
 const CS_BANDS=[[0,12e4,74],[12e4,25e4,21],[25e4,1e12,5]]; /* мифический кейс: по оценке номера, монет; шанс % */
 const CS_DG3=['001','002','003','005','007','100','111','222','333','444','555','666','777','888','999','123','700','500','099','199'];
@@ -1166,11 +1168,11 @@ const routes={
   },
 
   async 'GET /api/shop'(env,u,url,now){
-    return{items:Object.fromEntries(Object.entries(SHOP).map(([k,v])=>[k,{...v}])),srW:SR_W,csBands:CS_BANDS.map(b=>({from:b[0],to:b[1]>1e11?0:b[1],w:b[2]})),bx:u.bx>now?u.bx:0,xl:u.xl|0,xa:u.xa|0,lots:MAX_LOTS+(u.xl|0),auc:MAX_AUC+(u.xa|0),regions:Object.fromEntries(Object.entries(C).map(([k,v])=>[k,v.name]))};
+    return{items:Object.fromEntries(Object.entries(SHOP).filter(([k])=>SLOTS_ON||!SLOT_KEYS.includes(k)).map(([k,v])=>[k,{...v}])),srW:SR_W,csBands:CS_BANDS.map(b=>({from:b[0],to:b[1]>1e11?0:b[1],w:b[2]})),bx:u.bx>now?u.bx:0,xl:u.xl|0,xa:u.xa|0,lots:MAX_LOTS+(u.xl|0),auc:MAX_AUC+(u.xa|0),regions:Object.fromEntries(Object.entries(C).map(([k,v])=>[k,v.name]))};
   },
   async 'POST /api/shop/invoice'(env,u,url,now,b){
     const id=String(b.item||''),S=SHOP[id];
-    if(!S)throw new HttpErr(400,'bad');
+    if(!S||(!SLOTS_ON&&SLOT_KEYS.includes(id)))throw new HttpErr(400,'bad');
     const od={shop:id};
     if(S.k==='sr'||S.k==='cs'){const c=String(b.c||'');if(!C[c])throw new HttpErr(400,'bad');od.c=c}
     if((S.k==='bl'&&(u.xl|0)>=S.cap)||(S.k==='ba'&&(u.xa|0)>=S.cap))throw new HttpErr(409,'max');

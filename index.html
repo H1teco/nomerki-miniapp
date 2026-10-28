@@ -756,6 +756,33 @@ main{display:flex;flex-direction:column}
 .sx-res .pi{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:2px 10px;font-size:12px;color:var(--mut)}
 .sx-res .pi b{font-size:14px;color:var(--tx)}
 .sx-res.r5{border-color:#ff6bd6}.sx-res.r4{border-color:#ffb020}.sx-res.r3{border-color:#a56bff}
+
+.bar button.c{color:var(--mut)}
+.bar button.c .cb{width:48px;height:48px;margin-top:-26px;border-radius:50%;background:var(--ac);color:#0b0e14;display:flex;align-items:center;justify-content:center;border:4px solid #0d1119;box-shadow:0 8px 22px -6px rgba(200,240,60,.7)}
+.bar button.c .cb svg{width:26px;height:26px;stroke-width:2}
+.bar button.c.on{color:var(--ac)}
+.bar button.sp{color:#ffd34d}
+.bar button.sp svg{fill:none}
+.bar button.sp.on{color:#ffd34d}
+.bar button.sp.on svg{fill:currentColor}
+.pill.pb{border:1px solid var(--line);color:var(--tx);cursor:pointer;gap:8px;padding:0 4px 0 10px}
+.pill.pb .pl{width:32px;height:32px;border-radius:50%;background:#ffd34d;color:#1a1400;display:flex;align-items:center;justify-content:center}
+.pill.pb .pl svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round}
+.sx-promo{display:flex;align-items:center;gap:12px;width:100%;height:64px;margin-top:10px;padding:0 14px;border-radius:18px;border:1px solid #4a4220;background:linear-gradient(135deg,rgba(255,211,77,.16),rgba(255,211,77,.04));color:var(--tx);text-align:left;flex:none}
+.sx-promo .mp{flex:none;width:46px;height:30px;border-radius:5px;background:linear-gradient(180deg,#fff,#efefea);border:1.5px solid #222;color:#111;font:700 10px 'Unbounded',sans-serif;display:flex;align-items:center;justify-content:center}
+.sx-promo b{display:block;font-size:15px}
+.sx-promo small{display:block;font-size:12px;color:#c9c19a;margin-top:2px}
+.sx-promo svg{margin-left:auto;width:18px;height:18px;stroke:#ffd34d;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sx-hero{margin-top:6px;border-radius:24px;border:1px solid #4a4220;background:radial-gradient(90% 70% at 50% 0%,rgba(255,211,77,.2),transparent 70%),var(--card);padding:18px 16px 16px}
+.sx-hero .k{font-size:12px;font-weight:600;color:#ffd34d;letter-spacing:.04em}
+.sx-hero h3{margin:6px 0 0;font:700 20px Onest,sans-serif;line-height:1.25}
+.sx-hero .pl{margin:16px auto 0;display:flex;align-items:stretch;width:260px;max-width:100%;height:56px;border-radius:7px;background:linear-gradient(180deg,#fff,#efefea);border:2px solid #222;color:#111}
+.sx-hero .pl b{flex:1;display:flex;align-items:center;justify-content:center;font:700 28px 'Unbounded',sans-serif}
+.sx-hero .pl i{width:60px;border-left:2px solid #222;display:flex;flex-direction:column;align-items:center;justify-content:center;font-style:normal;font-size:10px;font-weight:700}
+.sx-hero .pl i u{text-decoration:none;font-size:22px}
+.sx-hero p{margin:12px 0 0;font-size:13px;color:var(--mut);line-height:1.4}
+.sx-hero .sx-row .btn.gh{background:#0f1420;border:1px solid #2a3348;color:var(--tx)}
+#t-shop{padding-bottom:16px}
 </style>
 </head>
 <body>
@@ -771,7 +798,7 @@ main{display:flex;flex-direction:column}
         <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8h14v-8M12 8C10 4 6 5 7 8c.5 1.5 3 1 5 0zM12 8c2-4 6-3 5 0-.5 1.5-3 1-5 0z"/></svg>
         <i class="dot"></i>
       </button>
-      <div class="pill"><i class="coin"></i><span id="coins">0</span></div>
+      <button class="pill pb" id="coins-b" aria-label="Пополнить в магазине"><i class="coin"></i><span id="coins">0</span><span class="pl"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
     </div>
   </header>
 
@@ -791,8 +818,11 @@ main{display:flex;flex-direction:column}
         <button class="cnt" id="cnt" aria-haspopup="dialog" aria-label="Сколько номеров крутить"><b id="cnt-n">×1</b><small>за раз</small></button>
       </div>
       <button class="spin" id="spin"><span id="spin-l">Крутить</span><span class="cost"><i class="coin"></i><span id="cost">1 000</span></span></button>
+      <button class="sx-promo" id="sp-custom"><span class="mp">ВАШ</span><span><b>Свой номер на заказ</b><small>Выберите цифры и буквы, от 25 звёзд</small></span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
       <div class="pity" id="pity" aria-live="polite"></div>
     </section>
+
+    <section class="tab" id="t-shop"><div id="shop-body"></div></section>
 
     <section class="tab" id="t-garage">
       <h2>Гараж</h2>
@@ -832,9 +862,6 @@ main{display:flex;flex-direction:column}
       <button class="btn pbtn" id="p-ach"><span>Достижения<i class="dot" id="p-ach-d" hidden></i></span><span id="p-ach-l" style="color:var(--mut);font-size:13px">Награды</span></button>
       <button class="btn pbtn" id="p-top"><span>Рейтинг игроков</span><span style="color:var(--mut);font-size:13px">Топ</span></button>
       <button class="btn pbtn" id="p-ref"><span>Пригласить друзей</span><span style="color:var(--ac);font-size:13px" id="p-ref-b">+15 000 за друга</span></button>
-      <button class="btn pbtn" id="p-check"><span>Проверить номер</span><span style="color:var(--mut);font-size:13px">Свободен или нет</span></button>
-      <button class="btn pbtn" id="p-shop"><span>Магазин</span><span style="color:#ffd34d;font-size:13px">⭐ монеты, кейсы</span></button>
-      <button class="btn pbtn" id="p-custom"><span>Номер на заказ</span><span style="color:#ffd34d;font-size:13px">⭐ Stars</span></button>
       <button class="btn pbtn" id="p-promo"><span>Промокод</span><span style="color:var(--mut);font-size:13px">Ввести</span></button>
       <button class="btn pbtn" id="p-admin" style="display:none"><span>Админ-панель</span><span style="color:var(--mut);font-size:13px">Открыть</span></button>
     </section>
@@ -869,9 +896,10 @@ main{display:flex;flex-direction:column}
   </main>
 
   <nav class="bar">
-    <button class="on" data-tab="spin"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/><circle cx="12" cy="12" r="2.2"/></svg>Крутить</button>
     <button data-tab="garage"><svg viewBox="0 0 24 24"><path d="M5 16l1.4-4.6A2 2 0 0 1 8.3 10h7.4a2 2 0 0 1 1.9 1.4L19 16"/><rect x="3" y="16" width="18" height="4.5" rx="1.8"/><path d="M7 18.2h.01M17 18.2h.01"/></svg>Гараж</button>
     <button data-tab="market"><svg viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>Рынок</button>
+    <button class="on c" data-tab="spin"><span class="cb"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/><circle cx="12" cy="12" r="2.2"/></svg></span>Крутить</button>
+    <button data-tab="shop" class="sp"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z"/></svg>Магазин</button>
     <button data-tab="profile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>Профиль<i class="bdot" id="bdot" hidden></i></button>
   </nav>
 </div>
@@ -909,7 +937,6 @@ main{display:flex;flex-direction:column}
 <div class="ov full" id="ov-rw"><div class="page" id="rw"></div></div>
 <div class="ov full" id="ov-cu"><div class="page" id="cu"></div></div>
 <div class="ov full" id="ov-fr"><div class="page" id="fr"></div></div>
-<div class="ov full" id="ov-sx"><div class="page" id="sx"></div></div>
 <div class="ov full" id="ov-sr"><div class="page" id="sr"></div></div>
 <div class="ov sheet" id="ov-pm"><div class="sh" id="pm"></div></div>
 <div class="ov sheet" id="ov-qs"><div class="sh" id="qs"></div></div>
@@ -1214,7 +1241,7 @@ async function api(m,path,body){
   if(!r.ok){if(j.error==='nosub')showSub();if(j.error==='maint')showErr('Технические работы',j.text||'Скоро вернёмся',()=>boot());throw Object.assign({status:r.status},j,{error:j.error||'server'})}
   return j;
 }
-const ERR={coins:'Не хватает монет',big:'Файл больше 20 МБ',nochat:'Сначала откройте бота и нажмите /start: файл загружается через ваш чат с ботом',tgfail:'Telegram не принял файл',framed:'С рамкой номер системе не сдать. Снимите рамку или выставьте номер на рынок',same:'Эта рамка уже стоит',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Лимит лотов исчерпан. Больше слотов можно купить в магазине ⭐',max:'Достигнут максимум',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nosub:'Нужна подписка на канал',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут',namewait:'Имя можно менять раз в 10 минут',badname:'Это имя нельзя использовать',badava:'Не подошло это фото, выберите другое',low:'Ставка уже перебита, обновил минимум',lead:'Вы уже лидируете',maint:'Идут технические работы',muted:'Вам закрыт доступ к рынку',bigamt:'Сумма больше лимита, нужно подтверждение',taken:'Такой номер уже выдан',bad_d:'Неверные цифры для этой страны',bad_l:'Неверные буквы для этой страны',bad_reg:'Такого региона нет',moved:'Номер уже сменил владельца',exists:'Такой код уже есть',busy:'Подождите несколько секунд',star:'Номер, купленный за ⭐, нельзя сдать системе. Выставьте его на рынок',toobig:'Слишком дорогой номер для покупки за ⭐',invoice:'Не удалось создать счёт. Попробуйте позже',lmax:'Сегодня больше билетов не купить',blocked:'Эта комбинация недоступна'};
+const ERR={coins:'Не хватает монет',big:'Файл больше 20 МБ',nochat:'Сначала откройте бота и нажмите /start: файл загружается через ваш чат с ботом',tgfail:'Telegram не принял файл',framed:'С рамкой номер системе не сдать. Снимите рамку или выставьте номер на рынок',same:'Эта рамка уже стоит',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Лимит лотов исчерпан. Снимите лот или дождитесь продажи',max:'Достигнут максимум',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nosub:'Нужна подписка на канал',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут',namewait:'Имя можно менять раз в 10 минут',badname:'Это имя нельзя использовать',badava:'Не подошло это фото, выберите другое',low:'Ставка уже перебита, обновил минимум',lead:'Вы уже лидируете',maint:'Идут технические работы',muted:'Вам закрыт доступ к рынку',bigamt:'Сумма больше лимита, нужно подтверждение',taken:'Такой номер уже выдан',bad_d:'Неверные цифры для этой страны',bad_l:'Неверные буквы для этой страны',bad_reg:'Такого региона нет',moved:'Номер уже сменил владельца',exists:'Такой код уже есть',busy:'Подождите несколько секунд',star:'Номер, купленный за ⭐, нельзя сдать системе. Выставьте его на рынок',toobig:'Слишком дорогой номер для покупки за ⭐',invoice:'Не удалось создать счёт. Попробуйте позже',lmax:'Сегодня больше билетов не купить',blocked:'Эта комбинация недоступна'};
 const errToast=e=>{toast(ERR[e&&e.error]||'Ошибка');hapN('error')};
 const hoursLeft=ms=>{const m=Math.max(0,Math.ceil(ms/6e4));return m>=60?Math.ceil(m/60)+' ч':m+' мин'};
 const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return m>10&&m<15?c:k===1?a:k>1&&k<5?b:c};
@@ -3352,22 +3379,24 @@ const SH={d:null,c:'KZ',busy:false};
 const SX_PK=['p1','p2','p3','p4'];
 const shDate=t=>new Date(t).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 async function openShop(){
-  hapI();
-  $('#sx').innerHTML=`<div class="ph"><h2 style="font-size:22px">Магазин ⭐</h2><button class="xbtn" id="sx-x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div><div class="empty" style="padding:40px"><div class="spinner" style="margin:0 auto"></div></div>`;
-  $('#sx-x').onclick=()=>hide('#ov-sx');
-  show('#ov-sx');
-  try{SH.d=await api('GET','/api/shop')}catch(e){hide('#ov-sx');errToast(e);return}
+  const B=$('#shop-body');
+  if(!SH.d)B.innerHTML='<div class="empty" style="padding:40px"><div class="spinner" style="margin:0 auto"></div></div>';
+  try{SH.d=await api('GET','/api/shop')}catch(e){if(!SH.d){B.innerHTML='<div class="empty"><b>Не загрузилось</b>Проверьте связь и откройте вкладку ещё раз</div>';errToast(e)}return}
   paintShop();
 }
 function paintShop(){
-  const d=SH.d;if(!d||!$('#ov-sx').classList.contains('on'))return;
+  const d=SH.d;if(!d||!$('#t-shop').classList.contains('on'))return;
   const it=d.items,base=it.p1.coins/it.p1.stars;
   const csn=x=>`${(x/1000)|0}`;
   const cs=d.csBands;
   const pk=SX_PK.map(k=>{const v=it[k],bonus=Math.round((v.coins/v.stars/base-1)*100);return `<button class="sx-c" data-i="${k}"><small>${bonus>0?'выгода +'+bonus+'%':'старт'}</small><b><i class="coin"></i>${fmt(v.coins)}</b><span class="pr">⭐ ${v.stars}</span></button>`}).join('');
   const bxOn=d.bx>Date.now();
   const cpills=pills(Object.keys(d.regions).map(k=>[k,flag(k)+' '+k]),SH.c,'shc');
-  $('#sx').innerHTML=`<div class="ph"><h2 style="font-size:22px">Магазин ⭐</h2><button class="xbtn" id="sx-x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
+  $('#shop-body').innerHTML=`<h2 class="sx-h" style="margin:6px 0 0;font:700 24px Onest,sans-serif">Магазин</h2>
+    <div class="sx-hero"><div class="k">НОМЕР НА ЗАКАЗ</div><h3>Свой номер, который будет только у вас</h3>
+      <div class="pl"><b>001 BMW</b><i><u>01</u>KAZ</i></div>
+      <p>Цена зависит от красоты комбинации и показывается до оплаты. Номер сразу попадает в гараж.</p>
+      <div class="sx-row"><button class="btn" id="sx-cu" style="background:#ffd34d;color:#1a1400;flex:1.4">Заказать номер</button><button class="btn gh" id="sx-ck" style="color:#eef1f7;background:#0f1420;border:1px solid #2a3348">Проверить</button></div></div>
     <p class="rwhint">Оплата Telegram Stars. Товары цифровые, выдаются сразу после оплаты. Шансы указаны ниже.</p>
     <div class="sx-box"><h3>Пакеты монет</h3><p>Монеты зачисляются на счёт сразу. Чем больше пакет, тем выгоднее.</p><div class="sx-g">${pk}</div></div>
     <div class="sx-box"><h3>Звёздная рулетка</h3><p>Каждый прокрут — эпичный номер или выше, без обычных и редких. Выберите страну номера.</p>${cpills}
@@ -3379,18 +3408,18 @@ function paintShop(){
       <div class="sx-row"><button class="btn gold" data-i="cs">Открыть кейс · ⭐ ${it.cs.stars}</button></div></div>
     <div class="sx-box"><h3>Ускорители</h3>
       <div class="sx-line"><div><b>×2 награды на ${it.bx.days} дней</b><small>Ежедневные награды и колесо удваиваются${bxOn?'. Активен до '+shDate(d.bx):''}</small></div><button class="btn gold" data-i="bx">⭐ ${it.bx.stars}</button></div>
-      <div class="sx-line"><div><b>+${it.bl.add} слотов лотов</b><small>Навсегда. Сейчас можно ${d.lots} лотов${d.xl>=it.bl.cap?', максимум':''}</small></div><button class="btn gold" data-i="bl"${d.xl>=it.bl.cap?' disabled':''}>⭐ ${it.bl.stars}</button></div>
-      <div class="sx-line"><div><b>+${it.ba.add} слота аукционов</b><small>Навсегда. Сейчас можно ${d.auc} аукционов${d.xa>=it.ba.cap?', максимум':''}</small></div><button class="btn gold" data-i="ba"${d.xa>=it.ba.cap?' disabled':''}>⭐ ${it.ba.stars}</button></div></div>
+      ${it.bl?`<div class="sx-line"><div><b>+${it.bl.add} слотов лотов</b><small>Навсегда. Сейчас можно ${d.lots} лотов${d.xl>=it.bl.cap?', максимум':''}</small></div><button class="btn gold" data-i="bl"${d.xl>=it.bl.cap?' disabled':''}>⭐ ${it.bl.stars}</button></div>`:''}
+      ${it.ba?`<div class="sx-line"><div><b>+${it.ba.add} слота аукционов</b><small>Навсегда. Сейчас можно ${d.auc} аукционов${d.xa>=it.ba.cap?', максимум':''}</small></div><button class="btn gold" data-i="ba"${d.xa>=it.ba.cap?' disabled':''}>⭐ ${it.ba.stars}</button></div>`:''}</div>
     <p class="cufine">Номера из звёздной рулетки и кейса нельзя сдать системе за монеты, их можно продать или обменять на рынке и аукционе. Условия: команда /terms в боте. Проблемы с оплатой: /paysupport.</p>`;
-  $('#sx-x').onclick=()=>hide('#ov-sx');
-  document.querySelectorAll('#sx .apills button').forEach(b=>b.onclick=()=>{if(SH.busy)return;hapS();SH.c=b.dataset.v;paintShop()});
-  document.querySelectorAll('#sx [data-i]').forEach(b=>b.onclick=()=>shopBuy(b.dataset.i,b));
+  $('#sx-cu').onclick=()=>{hapI();openCustom()};$('#sx-ck').onclick=()=>{hapI();openCustom('check')};
+  document.querySelectorAll('#shop-body .apills button').forEach(b=>b.onclick=()=>{if(SH.busy)return;hapS();SH.c=b.dataset.v;paintShop()});
+  document.querySelectorAll('#shop-body [data-i]').forEach(b=>b.onclick=()=>shopBuy(b.dataset.i,b));
 }
 async function shopBuy(item,btn){
   if(SH.busy||btn.disabled)return;
   const S0=SH.d.items[item];if(!S0)return;
   SH.busy=true;hapS();
-  document.querySelectorAll('#sx [data-i]').forEach(b=>b.disabled=true);
+  document.querySelectorAll('#shop-body [data-i]').forEach(b=>b.disabled=true);
   btn.textContent='Создаю счёт…';
   const needC=S0.k==='sr'||S0.k==='cs';
   let inv;
@@ -3433,9 +3462,8 @@ function showShopResult(list,isCase){
   show('#ov-sr');
   const best=L[0].rar;if(best>=3){burst(best);hapN('success')}else hapI('medium');
 }
-$('#p-shop').onclick=openShop;
-$('#p-custom').onclick=()=>{hapI();openCustom()};
-$('#p-check').onclick=()=>{hapI();openCustom('check')};
+$('#coins-b').onclick=()=>go('shop');
+$('#sp-custom').onclick=()=>{hapI();openCustom()};
 $('#m-check').onclick=()=>{hapI();openCustom('check')};
 
 function go(name){
@@ -3445,6 +3473,7 @@ function go(name){
   if(name==='garage')renderGarage();
   if(name==='market'){renderMarket();loadSub();if(msub==='auc')refreshMe()}
   if(name==='profile')paintProfile();
+  if(name==='shop')openShop();
   if(name==='spin'&&!spinning)requestAnimationFrame(remeasure);
   hapS();
 }
