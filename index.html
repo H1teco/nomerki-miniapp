@@ -566,6 +566,56 @@ main{display:flex;flex-direction:column}
 .rfst .stat{flex:1}
 .bcta{width:100%;min-height:150px;margin-top:14px;padding:12px 14px;border-radius:16px;background:var(--card);border:1px solid var(--line);color:var(--tx);font:500 15px Onest,sans-serif;resize:vertical;outline:0;-webkit-user-select:text;user-select:text}
 .aseg button{font-size:12px;padding:0 2px}
+/* --- v11: профиль, рейтинг, аукционы --- */
+.av{width:36px;height:36px;border-radius:50%;flex:none;background:linear-gradient(140deg,#c8f03c,#2bb3a3) center/cover;display:inline-flex;align-items:center;justify-content:center;font:700 14px Onest,sans-serif;color:#0b0e14;overflow:hidden}
+.pme{display:flex;align-items:center;gap:14px;width:100%;margin-top:12px;padding:14px 16px;border-radius:22px;background:var(--card);border:1px solid var(--line);color:var(--tx);text-align:left}
+.pme #p-avw{display:flex}
+.pme .av{width:56px;height:56px;font-size:22px}
+.pme .w{min-width:0;flex:1}
+.pme b{display:block;font:700 17px Onest,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pme small{display:block;margin-top:3px;font-size:12.5px;color:var(--mut)}
+.pme svg{width:16px;height:16px;stroke:var(--mut);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.pe-av{display:flex;flex-direction:column;align-items:center;gap:12px;margin:10px 0 4px}
+.pe-av .av{width:92px;height:92px;font-size:36px}
+.pe-row{display:flex;gap:8px;width:100%}
+.pe-row .btn{flex:1;height:42px;font-size:13px;padding:0 8px}
+.pe-row .btn+.btn{margin-top:0}
+.pe-lb{display:block;margin:14px 0 6px;font-size:13px;color:var(--mut);text-align:left}
+.pe-in{width:100%;height:50px;border-radius:16px;background:var(--card);border:1px solid #2a3348;color:var(--tx);font:500 16px Onest,sans-serif;padding:0 14px;outline:0;-webkit-user-select:text;user-select:text}
+.pe-in:focus{border-color:var(--ac)}
+.pe-in.err{border-color:#ff8a8a}
+.pe-lnk{border:0;background:none;color:var(--ac);font:600 13px Onest,sans-serif;padding:6px 0 0;text-align:left}
+.sh .fine{text-align:left}
+.rk.go{cursor:pointer}
+.rk .av{width:32px;height:32px;font-size:13px}
+.rk .sm .coin{width:14px;height:14px}
+.wkc{margin-top:12px;padding:14px 16px;border-radius:22px;background:radial-gradient(80% 120% at 0% 0%,rgba(251,191,36,.14),transparent 60%),var(--card);border:1px solid var(--line)}
+.wkc .t{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mut)}
+.wkc .t b{color:var(--tx);font:600 13px Onest,sans-serif}
+.wkc .pz{display:flex;gap:8px;margin-top:10px}
+.wkc .pz div{flex:1;text-align:center;padding:9px 4px;border-radius:14px;background:rgba(255,255,255,.05);font:500 12.5px Unbounded,sans-serif;display:flex;flex-direction:column;gap:3px}
+.wkc .pz small{font:500 11px Onest,sans-serif;color:var(--mut)}
+.pl-h{display:flex;align-items:center;gap:14px;text-align:left;margin-top:4px}
+.pl-h .av{width:68px;height:68px;font-size:26px}
+.pl-h b{display:block;font:700 19px Onest,sans-serif;overflow:hidden;text-overflow:ellipsis}
+.pl-h small{color:var(--mut);font-size:12.5px}
+.pl-st{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.pl-st div{padding:10px 12px;border-radius:16px;background:var(--card);border:1px solid var(--line);text-align:left}
+.pl-st small{display:block;color:var(--mut);font-size:12px}
+.pl-st b{display:flex;align-items:center;gap:6px;margin-top:4px;font:500 14px Unbounded,sans-serif}
+.pl-st .coin{width:14px;height:14px}
+.pl-w{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.pl-w span{padding:6px 12px;border-radius:14px;background:rgba(251,191,36,.12);color:#fbbf24;font:600 13px Onest,sans-serif}
+.slp{display:inline-flex;align-items:center;gap:7px;border:0;background:none;padding:0;margin-bottom:2px;color:var(--mut);font:500 12px Onest,sans-serif;text-align:left;max-width:100%}
+.slp .av{width:20px;height:20px;font-size:10px}
+.slp u{text-decoration:none;color:var(--tx)}
+.slp span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lot .bdg.t{font-variant-numeric:tabular-nums}
+.lot .lead{color:#6ee7a0;font-weight:700}
+.sellbtn{width:50px;padding:0;justify-content:center}
+.sellbtn svg{width:18px;height:18px}
+.seg2 button{font-size:12.5px;gap:5px}
+.sec.aus{margin:16px 0 0}
 </style>
 </head>
 <body>
@@ -626,7 +676,7 @@ main{display:flex;flex-direction:column}
 
     <section class="tab" id="t-profile">
       <h2>Профиль</h2>
-      <p class="mut" id="p-name"></p>
+      <button class="pme" id="p-me"><span id="p-avw"></span><span class="w"><b id="p-name"></b><small>Изменить имя и фото</small></span><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button>
       <div class="stats">
         <div class="stat glass"><small>Круток</small><b id="p-spins">0</b></div>
         <div class="stat glass"><small>Лучший номер</small><b><i class="coin"></i><span id="p-best">0</span></b></div>
@@ -652,16 +702,18 @@ main{display:flex;flex-direction:column}
       </div>
       <div class="mtop" style="margin-top:10px">
         <div class="seg2" role="tablist" aria-label="Раздел рынка">
-          <button class="on" role="tab" data-m="all" aria-selected="true">Лоты игроков</button>
-          <button role="tab" data-m="mine" aria-selected="false">Мои лоты<span class="bd" id="m-cnt">0</span></button>
+          <button class="on" role="tab" data-m="all" aria-selected="true">Лоты</button>
+          <button role="tab" data-m="auc" aria-selected="false">Аукционы<span class="bd" id="a-cnt">0</span></button>
+          <button role="tab" data-m="mine" aria-selected="false">Мои<span class="bd" id="m-cnt">0</span></button>
         </div>
-        <button class="sellbtn" id="m-sell" aria-label="Выставить номер на продажу"><svg viewBox="0 0 14 14"><path d="M7 2v10M2 7h10"/></svg>Продать</button>
+        <button class="sellbtn" id="m-sell" aria-label="Выставить номер на продажу"><svg viewBox="0 0 14 14"><path d="M7 2v10M2 7h10"/></svg></button>
       </div>
       <div id="m-all">
         <div class="cs" id="chips-market"></div>
         <div class="mrow"><span id="m-n">Лотов: 0</span><button id="m-sort"><span id="m-sort-l"></span><svg viewBox="0 0 12 12"><path d="M3 4.5L6 7.5l3-3"/></svg></button></div>
         <div id="m-list" style="margin-top:12px"></div>
       </div>
+      <div id="m-auc" style="display:none"><div id="au-list" style="margin-top:4px"></div></div>
       <div id="m-mine" style="display:none">
         <div class="sec" style="margin-top:4px">На продаже</div>
         <div id="ml-act" style="margin-top:10px"></div>
@@ -718,6 +770,9 @@ main{display:flex;flex-direction:column}
 <div class="ov" id="ov-sub"><div class="si"><svg viewBox="0 0 24 24"><path d="M21 4L3 11l6 2.2L11 20l3.2-4.4L18.5 19z"/><path d="M9 13.2L21 4"/></svg></div><h2>Подпишитесь на канал</h2><p>Игра доступна подписчикам канала <b>@layerplates</b>. Там новости игры и промокоды.</p><button class="btn go" id="sub-go">Подписаться</button><button class="btn" id="sub-ck">Я подписался</button></div>
 <div class="ov sheet" id="ov-sh"><div class="sh" id="sh"></div></div>
 <div class="ov sheet" id="ov-tr"><div class="sh" id="tr"></div></div>
+<div class="ov sheet" id="ov-pe"><div class="sh" id="pe"></div></div>
+<div class="ov sheet" id="ov-pl"><div class="sh" id="pl" style="max-height:88vh;overflow-y:auto"></div></div>
+<div class="ov sheet" id="ov-ab"><div class="sh" id="ab" style="max-height:92vh;overflow-y:auto"></div></div>
 <div id="fx"></div>
 <div id="toast"></div>
 
@@ -741,15 +796,15 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 /* ---------- данные ---------- */
-const BONUS=1500, START_COINS=20000, SELL=.8;
+const BONUS=1500, START_COINS=20000, SELL=.85;
 const RAR=[{n:'Обычный'},{n:'Необычный'},{n:'Редкий'},{n:'Эпичный'},{n:'Легендарный'},{n:'Мифический'}];
 /* рулетки: цена, нижняя граница качества и шансы [обычный … мифический] */
 const TIERS=[
-  {n:'Обычная',price:1000,note:'любые номера',w:[88,9,2.4,.5,.09,.01]},
-  {n:'Редкая',price:2500,note:'от необычных',w:[0,90,8,1.6,.35,.05]},
-  {n:'Эпическая',price:6000,note:'от редких',w:[0,0,90,8.3,1.5,.2]},
-  {n:'Элитная',price:15000,note:'от эпичных',w:[0,0,0,88,10.5,1.5]},
-  {n:'Легендарная',price:38000,note:'от легендарных',w:[0,0,0,0,95,5]}
+  {n:'Обычная',price:1000,note:'любые номера',w:[95.24,3.61,.96,.16,.02,.01]},
+  {n:'Редкая',price:2500,note:'от необычных',w:[0,92.52,6.17,1.09,.18,.04]},
+  {n:'Эпическая',price:7000,note:'от редких',w:[0,0,91.96,6.55,1.23,.25]},
+  {n:'Элитная',price:17500,note:'от эпичных',w:[0,0,0,92.02,6.88,1.1]},
+  {n:'Легендарная',price:42000,note:'от легендарных',w:[0,0,0,0,95.5,4.5]}
 ];
 const W_MARKET=[40,28,18,9,4,1];
 const rg=(codes,name,m)=>codes.map(c=>[c,name,m]);
@@ -790,12 +845,12 @@ const CHIPS=[['ALL','Все'],['KZ','Казахстан'],['RU','Россия'],
 const NICKS=['kairat_77','dimon_msk','oleg.kyiv','aigerim','sasha_by','nurlan_k','vlad_spb','marat','anya_minsk','temirlan','zhanna_02','ruslan_kz'];
 /* пары (качество цифр, качество букв) для итогового качества номера; у высоких обе части — комбинации */
 const PAIRS=[
-  [[0,0]],
-  [[1,0],[0,1],[1,1]],
-  [[2,0],[0,2],[2,1],[1,2]],
-  [[3,1],[1,3],[2,2]],
-  [[3,2],[2,3],[3,3],[4,2],[2,4]],
-  [[4,3],[3,4],[4,4]]
+  [[0,0],[0,0],[0,1],[1,0]],
+  [[0,2],[2,0],[2,1],[1,2],[1,1]],
+  [[0,3],[2,2],[3,0],[1,3],[2,2]],
+  [[0,4],[3,1],[2,3],[4,0],[3,2],[1,4]],
+  [[4,1],[4,2],[2,4],[3,3],[3,2]],
+  [[3,4],[4,3],[4,4]]
 ];
 
 /* ---------- генератор номеров ---------- */
@@ -841,10 +896,10 @@ function digitTag(d){
   if(/^[1-9]00$/.test(d))return 'Круглая сотня';
   if(d.length===4&&/^000\d$/.test(d))return 'Нули впереди';
   if(['0123','1234'].includes(d)||isSeq(d))return 'Лесенка';
+  if(/^0[1-9]0$/.test(d)||d==='707'||d==='077')return 'Красивые нули';
   if(d===[...d].reverse().join(''))return 'Зеркало';
   if(/^(\d\d)\1$/.test(d))return 'Повтор';
   if(/(\d)\1(\d)\2/.test(d))return 'Две пары';
-  if(/^0[1-9]0$/.test(d)||d==='707'||d==='077')return 'Красивые нули';
   if(/^00\d\d$/.test(d))return 'Два нуля';
   if(/(\d)\1/.test(d))return 'Пара';
   if(/00$/.test(d))return 'Круглый';
@@ -864,8 +919,16 @@ function dupL(c,n,excl){
 }
 const nice=v=>v<1000?Math.round(v/10)*10:v<10000?Math.round(v/50)*50:v<100000?Math.round(v/500)*500:Math.round(v/1000)*1000;
 /* ---------- оценка: единица × цифры × буквы × регион ---------- */
-const UNIT=600;
-const LMULT=[1,1.5,2.6,5,10];
+const UNIT=700;
+/* множитель букв по качеству серии; отдельные «топовые» серии ценятся выше (по реальным ценникам: АМР, ААА, ТТТ и т.д.) */
+const LMULT=[1,1.6,2.5,6,12];
+const LTOP={
+  KZ:{AAA:16,AMG:14,VIP:13,BMW:13,MMM:14,SSS:14,XXX:14,ZZZ:14},
+  RU:{'АМР':30,'ЕКХ':24,'ААА':20,'МММ':18,'ООО':18,'ССС':16,'ММР':18,'ВМР':16,'ККК':14,'ТТТ':14,'ХХХ':14,'ВВВ':14,'ННН':14,'ВОР':9,'ХАМ':8,'МЕР':8,'АМО':10,'ААМ':9},
+  UA:{},
+  BY:{AA:12,MM:12,XX:12,OO:12}
+};
+const lmOf=(c,L,gl)=>(LTOP[c]&&LTOP[c][L])||LMULT[gl]||1;
 const ELITE_M={'777':22,'888':20,'999':18,'0001':28,'0007':26,'7777':40,'0777':16};
 /* границы редкости по оценке: ниже первой — обычный, выше последней — мифический */
 const TH=[1500,3600,9000,22000,60000];
@@ -873,16 +936,16 @@ const rarOf=v=>{let r=0;while(r<TH.length&&v>=TH[r])r++;return r};
 function digitMult(d){
   const n=d.length,t=digitTag(d);
   switch(t){
-    case 'Элитные цифры':return ELITE_M[d]||(/^00[1-9]$/.test(d)?12:14);
-    case 'Тройка':return 8;
-    case 'Четвёрка':return 14;
-    case 'Круглая сотня':return 6;
-    case 'Нули впереди':return 8;
-    case 'Лесенка':return n===3?4.5:7;
-    case 'Зеркало':return n===3?1.8:2.4;
+    case 'Элитные цифры':return ELITE_M[d]||(/^00[1-9]$/.test(d)?22:20);
+    case 'Тройка':return 13;
+    case 'Четвёрка':return 16;
+    case 'Круглая сотня':return 12;
+    case 'Нули впереди':return 10;
+    case 'Лесенка':return n===3?5:8;
+    case 'Зеркало':return n===3?1.5:2.4;
     case 'Повтор':return 2.2;
     case 'Две пары':return 2;
-    case 'Красивые нули':return 3;
+    case 'Красивые нули':return 5.5;
     case 'Два нуля':return 2.8;
     case 'Пара':return 1.3;
     case 'Круглый':return 2.4;
@@ -891,6 +954,9 @@ function digitMult(d){
 }
 function makePlate0(c,g){
   const [gd,gl]=pick(PAIRS[g]);
+  return makeByPair(c,gd,gl,g);
+}
+function makeByPair(c,gd,gl,g){
   const m=CMB[c],RG=C[c].reg,n=(c==='UA'||c==='BY')?4:3,caps=CAP[c];
   let reg,L,lt=null;
   if(c==='UA'){
@@ -923,7 +989,7 @@ function makePlate0(c,g){
   if(c==='UA'){p.pre=reg[0];p.suf=L}
   if(c==='BY')p.l=L;
   p.tags=[gd>0?digitTag(d):null,lt,reg[2]>=1.4?'Столичный регион':null].filter(Boolean);
-  const dm=digitMult(d),lm=LMULT[gl]||1,rm=reg[2];
+  const dm=digitMult(d),lm=lmOf(c,L,gl),rm=reg[2];
   p.mx=[dm,lm,rm];
   p.v=nice(UNIT*dm*lm*rm*(.95+Math.random()*.15));
   return p;
@@ -990,7 +1056,7 @@ async function api(m,path,body){
   if(!r.ok){if(j.error==='nosub')showSub();throw Object.assign({status:r.status},j,{error:j.error||'server'})}
   return j;
 }
-const ERR={coins:'Не хватает монет',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Не больше '+MAX_LOTS+' лотов',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nosub:'Нужна подписка на канал',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут'};
+const ERR={coins:'Не хватает монет',gone:'Номер или лот уже недоступны',net:'Нет связи с сервером',limit:'Не больше '+MAX_LOTS+' лотов',own:'Это ваш лот',wait:'Бонус ещё не готов',auth:'Сессия устарела, откройте игру заново',expired:'Сессия устарела, откройте игру заново',bad:'Некорректное значение',server:'Ошибка сервера, попробуйте ещё раз',banned:'Доступ закрыт администратором',nosub:'Нужна подписка на канал',nouser:'Игрок не найден',exhausted:'Номера этой рулетки закончились, выберите другую',nopromo:'Такого промокода нет',promo_used:'Вы уже активировали этот промокод',promo_over:'Промокод закончился или истёк',slow:'Слишком много попыток, подождите несколько минут',namewait:'Имя можно менять раз в 10 минут',badname:'Это имя нельзя использовать',badava:'Не подошло это фото, выберите другое',low:'Ставка уже перебита, обновил минимум',lead:'Вы уже лидируете'};
 const errToast=e=>{toast(ERR[e&&e.error]||'Ошибка');hapN('error')};
 const hoursLeft=ms=>{const m=Math.max(0,Math.ceil(ms/6e4));return m>=60?Math.ceil(m/60)+' ч':m+' мин'};
 const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return m>10&&m<15?c:k===1?a:k>1&&k<5?b:c};
@@ -1019,10 +1085,11 @@ const show=id=>$(id).classList.add('on'), hide=id=>$(id).classList.remove('on');
 
 /* ---------- шапка ---------- */
 function paintHead(){
-  $('#nm').textContent=(user&&user.first_name)||'Игрок';
-  const a=$('#ava');
-  if(user&&user.photo_url){a.style.backgroundImage=`url(${user.photo_url})`;a.textContent=''}
-  else a.textContent=((user&&user.first_name)||'И')[0].toUpperCase();
+  const nm=S.name||(user&&user.first_name)||'Игрок';
+  $('#nm').textContent=nm;
+  const a=$('#ava'),url=aUrl(S.ava!=null?S.ava:(user&&user.photo_url));
+  a.style.backgroundImage=url?`url('${cssUrl(url)}')`:'';
+  a.textContent=url?'':nm.trim()[0].toUpperCase();
   $('#sub').textContent='В гараже: '+S.inv.length;
 }
 const fmtLeft=ms=>{const m=Math.max(1,Math.ceil(ms/6e4)),h=Math.floor(m/60);return h?`${h} ч ${m%60} мин`:`${m} мин`};
@@ -1258,7 +1325,7 @@ let fitQ=0;
 const queueFit=()=>{if(fitQ)return;fitQ=requestAnimationFrame(()=>{fitQ=0;fitStatic()})};
 new MutationObserver(queueFit).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
 window.__fit={fitStatic,spills,fitSlotPlate};
-window.__t={makePlate,plateHTML,mount,slots:()=>slots,C,CMB,TIERS,SELL,UNIT,rarOf,digitMult,rollPlate,wpick,mythic,mxList,openSheet,fmt,S:()=>S};
+window.__t={makePlate,plateHTML,mount,slots:()=>slots,C,CMB,TIERS,SELL,UNIT,rarOf,digitMult,rollPlate,wpick,mythic,mxList,openSheet,fmt,openPlayer,openProfileEdit,openBid,openSell,loadAuc,avH,AUC:()=>AUC,S:()=>S};
 const yPos=(s,i)=>-i*s.ih+(s.h-s.ih)/2;
 function sizeItems(s){const h=s.h+'px';[...s.st.children].forEach(e=>{e.style.height=h;e.style.lineHeight=h})}
 function fill(s,chars,idx){
@@ -1604,7 +1671,7 @@ $('#g-quick').onclick=()=>{hapI();openQuick()};
 $('#ov-qs').onclick=e=>{if(e.target.id==='ov-qs')hide('#ov-qs')};
 function openSheet(id){
   const p=S.inv.find(x=>x.id===id);if(!p)return;
-  if(p.st==='listed'){toast('Номер на рынке. Снять можно в «Мои лоты»');return}
+  if(p.st==='listed'){toast('Номер на рынке или в аукционе. Снять можно в разделе «Рынок»');return}
   $('#sh').className='sh r'+p.rar;
   $('#sh').innerHTML=`<div class="grab"></div>
     <div style="display:flex;justify-content:center">${plateHTML(p,'min(30px,7.8vw)',true)}</div>
@@ -1630,7 +1697,7 @@ $('#ov-sh').onclick=e=>{if(e.target.id==='ov-sh')hide('#ov-sh')};
 let mkt=[],mine={active:[],sold:[]},msub='all',mLoad=0;
 const SORTS={val:['Сначала выгодные',(a,b)=>a.price/a.plate.v-b.price/b.plate.v],rar:['Сначала редкие',(a,b)=>b.plate.rar-a.plate.rar||b.plate.v-a.plate.v],cheap:['Сначала дешёвые',(a,b)=>a.price-b.price]};
 const lotWhere=p=>`${flag(p.c)} ${p.regName}`;
-function paintMCount(){const b=$('#m-cnt');b.textContent=S.lotsN;b.classList.toggle('has',S.lotsN>0)}
+function paintMCount(){const b=$('#m-cnt');b.textContent=S.lotsN;b.classList.toggle('has',S.lotsN>0);const a=$('#a-cnt'),n=S.aucN||0;a.textContent=n;a.classList.toggle('has',n>0)}
 async function loadMarket(manual){
   const my=++mLoad;
   try{
@@ -1647,10 +1714,11 @@ function renderMarket(){
     const p=l.plate,pc=Math.round((l.price/p.v-1)*100);
     return `<div class="lot r${p.rar}" data-id="${l.id}">
       <div class="tp">${plateHTML(p,'14px')}<span class="bdg ${pc<=0?'g':'a'}">${pc===0?'По оценке':(pc<0?'−':'+')+Math.abs(pc)+'% к оценке'}</span></div>
-      <div class="bt"><div><div class="sl2">${l.seller} · ${p.regName}</div><div class="pr"><i class="coin"></i>${fmt(l.price)}</div><div class="ev">Оценка ${fmt(p.v)}</div></div>
+      <div class="bt"><div><button class="slp" data-p="${l.sellerId}">${avH({ava:l.sellerAva,name:l.seller})}<span><u>${esc(l.seller)||'Игрок'}</u> · ${p.regName}</span></button><div class="pr"><i class="coin"></i>${fmt(l.price)}</div><div class="ev">Оценка ${fmt(p.v)}</div></div>
       <button class="buy${S.coins<l.price?' dim':''}" data-id="${l.id}">Купить</button></div></div>`}).join('')||'<div class="empty"><b>Лотов пока нет</b>Рынок наполняют игроки. Выставьте свой номер первым.</div>';
 }
 $('#m-list').onclick=async e=>{
+  const sp=e.target.closest('.slp');if(sp){openPlayer(sp.dataset.p);return}
   const b=e.target.closest('.buy');if(!b||b.disabled)return;
   const l=mkt.find(m=>m.id===b.dataset.id);if(!l)return;
   if(S.coins<l.price){toast('Не хватает монет');hapN('error');return}
@@ -1668,13 +1736,15 @@ $('#m-list').onclick=async e=>{
 $('#m-sort').onclick=()=>{const k=Object.keys(SORTS);S.msort=k[(k.indexOf(S.msort)+1)%k.length];save();renderMarket();hapS()};
 $('#m-refresh').onclick=()=>{
   const b=$('#m-refresh');b.classList.add('go');setTimeout(()=>b.classList.remove('go'),520);
-  hapI();msub==='all'?loadMarket(true):loadMine(true);
+  hapI();loadSub(true);
 };
+function loadSub(manual){msub==='all'?loadMarket(manual):msub==='auc'?loadAuc(manual):loadMine(manual)}
 function setSub(k){
   msub=k;
   document.querySelectorAll('.seg2 button').forEach(b=>{const on=b.dataset.m===k;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});
-  $('#m-all').style.display=k==='all'?'':'none';$('#m-mine').style.display=k==='mine'?'':'none';
-  k==='all'?loadMarket():loadMine();
+  $('#m-all').style.display=k==='all'?'':'none';$('#m-auc').style.display=k==='auc'?'':'none';$('#m-mine').style.display=k==='mine'?'':'none';
+  loadSub();
+  if(k==='auc')refreshMe();
 }
 document.querySelector('.seg2').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.m===msub)return;hapS();setSub(b.dataset.m)};
 
@@ -1683,7 +1753,7 @@ async function loadMine(manual){
   try{
     mine=await api('GET','/api/lots');S.lotsN=mine.active.length;paintMCount();renderMine();
     const ids=new Set(mine.active.map(l=>l.plate.id));
-    let ch=false;S.inv.forEach(p=>{const st=ids.has(p.id)?'listed':p.st==='listed'?'own':p.st;if(st!==p.st){p.st=st;ch=true}});
+    let ch=false;S.inv.forEach(p=>{const st=(ids.has(p.id)||(aucIds&&aucIds.has(p.id)))?'listed':(p.st==='listed'&&aucIds)?'own':p.st;if(st!==p.st){p.st=st;ch=true}});
     if(ch)renderGarage();
   }catch(e){if(manual)errToast(e)}
 }
@@ -1693,7 +1763,7 @@ function renderMine(){
     <div class="tp">${plateHTML(l.plate,'14px')}<span class="bdg a">Осталось ${left(l)}</span></div>
     <div class="bt"><div><div class="sl2">Вы получите ${fmt(l.net)} после комиссии</div><div class="pr"><i class="coin"></i>${fmt(l.price)}</div></div><button class="rm" data-id="${l.id}">Снять</button></div></div>`).join('')||'<div class="empty" style="padding:22px"><b>Пока пусто</b>Нажмите «Продать» и выберите номер из гаража.</div>';
   const d=t=>{const x=new Date(t),n=new Date();return x.toDateString()===n.toDateString()?'сегодня':x.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})};
-  $('#ml-sold').innerHTML=mine.sold.map(l=>`<div class="lot sold"><div>${plateHTML(l.plate,'12px')}<div class="sl2" style="margin-top:8px">${l.buyer||'Игрок'} купил · ${d(l.at)}</div></div><div style="text-align:right"><span class="bdg g" style="display:inline-flex">Продано</span><div class="gain"><i class="coin"></i>+${fmt(l.net)}</div></div></div>`).join('')||'<div class="empty" style="padding:22px">Продаж пока не было.</div>';
+  $('#ml-sold').innerHTML=mine.sold.map(l=>`<div class="lot sold"><div>${plateHTML(l.plate,'12px')}<div class="sl2" style="margin-top:8px">${esc(l.buyer)||'Игрок'} купил · ${d(l.at)}</div></div><div style="text-align:right"><span class="bdg g" style="display:inline-flex">Продано</span><div class="gain"><i class="coin"></i>+${fmt(l.net)}</div></div></div>`).join('')||'<div class="empty" style="padding:22px">Продаж пока не было.</div>';
 }
 $('#ml-act').onclick=async e=>{
   const b=e.target.closest('.rm');if(!b||b.disabled)return;b.disabled=true;
@@ -1702,67 +1772,329 @@ $('#ml-act').onclick=async e=>{
   await loadMine();
 };
 
-/* продажа игроку */
+/* продажа игроку: фиксированная цена или аукцион */
 function pickToSell(){
   const own=S.inv.filter(p=>p.st==='own').sort((a,b)=>b.rar-a.rar||b.v-a.v);
   if(!own.length){toast('В гараже нет номеров для продажи');hapN('error');return}
-  if(S.lotsN>=MAX_LOTS){toast('Не больше '+MAX_LOTS+' лотов');hapN('error');return}
   $('#pk').innerHTML=`<div class="grab"></div><h4>Какой номер продать</h4><p class="mut" style="text-align:left;margin:0 0 6px">Выберите номер из гаража.</p>`+
     own.map(p=>`<button class="pk r${p.rar}" data-id="${p.id}">${plateHTML(p,'11px')}<span class="meta"><span class="rl" style="display:block">${RAR[p.rar].n}</span><span class="val"><i class="coin"></i>${fmt(p.v)}</span></span></button>`).join('');
   show('#ov-pk');
 }
 $('#m-sell').onclick=()=>{hapI();pickToSell()};
-$('#pk').onclick=e=>{const b=e.target.closest('.pk');if(!b)return;const p=S.inv.find(x=>x.id===b.dataset.id);if(!p)return;hide('#ov-pk');openSell(p)};
+$('#pk').onclick=e=>{const b=e.target.closest('button.pk');if(!b)return;const p=S.inv.find(x=>x.id===b.dataset.id);if(!p)return;hide('#ov-pk');openSell(p)};
 $('#ov-pk').onclick=e=>{if(e.target.id==='ov-pk')hide('#ov-pk')};
 let SL=null;
 const QC=[['−10%',-.10],['−7% · быстро',-.07],['По оценке',0],['+10%',.10]];
+const AQ=[['Минимум',p=>slMin(p)],['−5%',p=>Math.max(slMin(p),nice(p.v*.95))],['По оценке',p=>p.v],['+20%',p=>nice(p.v*1.2)]];
 const slMin=p=>Math.max(100,Math.ceil(p.v*SELL)),slMax=p=>Math.ceil(p.v*3);
-function openSell(p){
-  if(S.lotsN>=MAX_LOTS){toast('Не больше '+MAX_LOTS+' лотов');hapN('error');return}
-  SL={p,price:nice(p.v*.93),busy:false};
+const slDef=(p,mode)=>mode==='auc'?Math.max(slMin(p),nice(p.v*.9)):nice(p.v*.93);
+function openSell(p,mode){
+  mode=mode||(msub==='auc'?'auc':'fix');
+  if(mode==='fix'&&S.lotsN>=MAX_LOTS)mode='auc';
+  SL={p,mode,hours:24,price:slDef(p,mode),busy:false};
   $('#sell').innerHTML=`
-    <div class="ph"><h2 style="font-size:22px">Выставить номер</h2><button class="xbtn" id="sl-x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
+    <div class="ph"><h2 style="font-size:22px">Продать номер</h2><button class="xbtn" id="sl-x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
     <div class="sell-card r${p.rar}">${plateHTML(p,'min(24px,6.2vw)',true)}<div class="ev2">Оценка <i class="coin"></i><b>${fmt(p.v)}</b></div></div>
-    <label for="sl-in" style="display:block;margin-top:22px;font-size:13px;color:var(--mut);font-weight:500">Ваша цена</label>
+    <div class="aseg" id="sl-mode" role="tablist" aria-label="Способ продажи" style="margin-top:16px"><button data-k="fix">Фикс-цена</button><button data-k="auc">Аукцион</button></div>
+    <label for="sl-in" id="sl-lb" style="display:block;margin-top:18px;font-size:13px;color:var(--mut);font-weight:500">Ваша цена</label>
     <div class="pin" id="sl-pin"><i class="coin"></i><input id="sl-in" inputmode="numeric" autocomplete="off" aria-label="Цена"></div>
-    <div class="qchips" id="sl-q">${QC.map((q,i)=>`<button class="qc" data-i="${i}">${q[0]}</button>`).join('')}</div>
-    <p class="fine" id="sl-fine">Цена ниже оценки — купят быстрее. Лот висит 24 часа, потом вернётся в гараж.</p>
-    <div class="calc" style="margin:18px 0 0"><div>Цена покупателя<b><i class="coin"></i><span id="sl-p"></span></b></div><div>Комиссия рынка ${COMM}%<b style="color:var(--mut)">−<span id="sl-c"></span></b></div><hr><div class="df">Вы получите<b class="pos"><span id="sl-n"></span></b></div></div>
-    <div class="pg-foot"><p>Пока номер на рынке, продать его в гараже нельзя</p><button class="btn gold" id="sl-go"></button></div>`;
-  const inp=$('#sl-in');inp.value=fmt(SL.price);
+    <div class="qchips" id="sl-q"></div>
+    <div id="sl-hw" style="display:none"><div style="margin-top:14px;font-size:13px;color:var(--mut);font-weight:500">Длительность</div>
+      <div class="qchips" id="sl-h">${[[1,'1 час'],[6,'6 часов'],[24,'24 часа']].map(h=>`<button class="qc" data-h="${h[0]}">${h[1]}</button>`).join('')}</div></div>
+    <p class="fine" id="sl-fine"></p>
+    <div class="calc" style="margin:18px 0 0"><div><span id="sl-l1">Цена покупателя</span><b><i class="coin"></i><span id="sl-p"></span></b></div><div>Комиссия ${COMM}%<b style="color:var(--mut)">−<span id="sl-c"></span></b></div><hr><div class="df"><span id="sl-l2">Вы получите</span><b class="pos"><span id="sl-n"></span></b></div></div>
+    <div class="pg-foot"><p id="sl-foot"></p><button class="btn gold" id="sl-go"></button></div>`;
+  const inp=$('#sl-in');
   inp.oninput=()=>{const d=inp.value.replace(/\D/g,'').slice(0,9);SL.price=+d||0;inp.value=d?fmt(+d):'';paintSell()};
-  $('#sl-q').onclick=e=>{const b=e.target.closest('.qc');if(!b)return;const k=QC[+b.dataset.i][1];SL.price=k===0?p.v:nice(p.v*(1+k));inp.value=fmt(SL.price);paintSell();hapS()};
+  $('#sl-q').onclick=e=>{const b=e.target.closest('.qc');if(!b)return;const i=+b.dataset.i;SL.price=SL.mode==='auc'?AQ[i][1](p):(QC[i][1]===0?p.v:nice(p.v*(1+QC[i][1])));inp.value=fmt(SL.price);paintSell();hapS()};
+  $('#sl-h').onclick=e=>{const b=e.target.closest('.qc');if(!b)return;SL.hours=+b.dataset.h;paintSell();hapS()};
+  $('#sl-mode').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.k===SL.mode)return;SL.mode=b.dataset.k;SL.price=slDef(p,SL.mode);hapS();paintSell(true)};
   $('#sl-x').onclick=()=>hide('#ov-sell');
   $('#sl-go').onclick=doList;
-  paintSell();show('#ov-sell');
+  paintSell(true);show('#ov-sell');
 }
-function paintSell(){
-  const{p,price}=SL,lo=slMin(p),hi=slMax(p),okp=price>=lo&&price<=hi,net=Math.floor(price*(100-COMM)/100);
+function paintSell(reset){
+  const{p,price,mode}=SL,auc=mode==='auc',lo=slMin(p),hi=slMax(p),okp=price>=lo&&price<=hi,net=Math.floor(price*(100-COMM)/100);
+  if(reset){
+    $('#sl-in').value=fmt(SL.price);
+    $('#sl-q').innerHTML=(auc?AQ.map(q=>q[0]):QC.map(q=>q[0])).map((t,i)=>`<button class="qc" data-i="${i}">${t}</button>`).join('');
+    $('#sl-lb').textContent=auc?'Стартовая цена':'Ваша цена';
+    $('#sl-hw').style.display=auc?'':'none';
+    $('#sl-l1').textContent=auc?'Старт торгов':'Цена покупателя';
+    $('#sl-l2').textContent=auc?'Получите минимум':'Вы получите';
+    $('#sl-foot').textContent=auc?'Пока идут торги, номер нельзя продать. Снять можно, пока нет ставок':'Пока номер на рынке, продать его в гараже нельзя';
+    document.querySelectorAll('#sl-mode button').forEach(b=>b.classList.toggle('on',b.dataset.k===mode));
+  }
   $('#sl-p').textContent=fmt(price);$('#sl-c').textContent=fmt(price-net);$('#sl-n').textContent=fmt(net);
   $('#sl-pin').classList.toggle('err',!okp&&price>0);
   const f=$('#sl-fine');f.classList.toggle('bad',!okp);
-  f.textContent=okp?'Цена ниже оценки — купят быстрее. Лот висит 24 часа, потом вернётся в гараж.':`Допустимая цена: от ${fmt(lo)} до ${fmt(hi)}`;
-  const g=$('#sl-go');g.disabled=!okp||SL.busy;g.textContent=okp?'Выставить за '+fmt(price):'Укажите цену';
-  document.querySelectorAll('#sl-q .qc').forEach((b,i)=>{const k=QC[i][1];b.classList.toggle('on',price===(k===0?p.v:nice(p.v*(1+k))))});
+  f.textContent=okp?(auc?'Побеждает самая высокая ставка. Не будет ставок — номер вернётся в гараж.':'Цена ниже оценки — купят быстрее. Лот висит 24 часа, потом вернётся в гараж.'):`Допустимая цена: от ${fmt(lo)} до ${fmt(hi)}`;
+  const g=$('#sl-go');g.disabled=!okp||SL.busy;g.textContent=okp?(auc?'Запустить аукцион':'Выставить за '+fmt(price)):'Укажите цену';
+  document.querySelectorAll('#sl-q .qc').forEach((b,i)=>{const v=auc?AQ[i][1](p):(QC[i][1]===0?p.v:nice(p.v*(1+QC[i][1])));b.classList.toggle('on',price===v)});
+  document.querySelectorAll('#sl-h .qc').forEach(b=>b.classList.toggle('on',+b.dataset.h===SL.hours));
 }
 async function doList(){
   if(!SL||SL.busy)return;SL.busy=true;paintSell();
+  const auc=SL.mode==='auc';
   try{
-    await api('POST','/api/list',{plateId:SL.p.id,price:SL.price});
+    if(auc)await api('POST','/api/auction/create',{plateId:SL.p.id,start:SL.price,hours:SL.hours});
+    else await api('POST','/api/list',{plateId:SL.p.id,price:SL.price});
     const q=S.inv.find(x=>x.id===SL.p.id);if(q)q.st='listed';
-    S.lotsN++;paintMCount();hide('#ov-sell');hide('#ov-mr');renderGarage();paintHead();
-    toast('Номер выставлен на рынок');hapN('success');
-    go('market');setSub('mine');
-  }catch(e){SL.busy=false;paintSell();errToast(e);if(e.error==='gone')refreshMe()}
+    if(!auc){S.lotsN++;paintMCount()}
+    hide('#ov-sell');hide('#ov-mr');renderGarage();paintHead();
+    toast(auc?'Аукцион запущен':'Номер выставлен на рынок');hapN('success');
+    go('market');setSub(auc?'auc':'mine');
+  }catch(e){
+    SL.busy=false;paintSell();
+    if(e.error==='limit'&&auc){toast('Не больше '+(AUC.max||3)+' аукционов одновременно');hapN('error')}
+    else errToast(e);
+    if(e.error==='gone')refreshMe();
+  }
 }
 
-setInterval(()=>{if($('#t-market').classList.contains('on')&&!document.hidden&&!$('.ov.on'))msub==='all'?loadMarket():loadMine()},15000);
+setInterval(()=>{if($('#t-market').classList.contains('on')&&!document.hidden&&!$('.ov.on'))loadSub()},15000);
 
 /* ---------- чипы: клики ---------- */
 $('#chips-spin').onclick=e=>{const b=e.target.closest('.ctile');if(!b||spinning)return;S.filter=b.dataset.k;save();renderChips();idle();hapS()};
 $('#chips-market').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;S.mfilter=b.dataset.k;save();renderChips();loadMarket(true);hapS()};
 
 
+
+/* ---------- аватары и имена ---------- */
+const aUrl=u=>!u?'':/^(https?:|data:)/.test(u)?u:API+u;
+const cssUrl=u=>String(u).replace(/['"()\\\s]/g,encodeURIComponent);
+function avH(o,cls){
+  const url=aUrl(o&&o.ava),nm=String((o&&o.name)||'Игрок').trim();
+  return `<i class="av${cls?' '+cls:''}"${url?` style="background-image:url('${cssUrl(url)}')"`:''}>${url?'':esc(nm[0].toUpperCase())}</i>`;
+}
+function applyUser(u){S.uid=u.id;S.name=u.name;S.ava=u.ava;S.custom=!!u.custom;S.hasAva=!!u.hasAva;S.tname=u.tname}
+
+/* ---------- редактирование профиля ---------- */
+const NAME_RE=/^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,19}$/u;
+let PE=null;
+function peAva(){
+  if(PE.ava)return PE.ava;
+  if(PE.resetAva)return(user&&user.photo_url)||'';
+  return S.ava!=null?S.ava:((user&&user.photo_url)||'');
+}
+function pePaint(){
+  const nm=$('#pe-in').value.replace(/\s+/g,' ').trim();
+  $('#pe-prev').innerHTML=avH({ava:peAva(),name:nm||S.name});
+  const hasPhoto=!!PE.ava||(S.hasAva&&!PE.resetAva);
+  $('#pe-rmv').style.display=hasPhoto?'':'none';
+  $('#pe-nm').style.display=(S.custom&&!PE.resetName)?'':'none';
+  const bad=!PE.resetName&&nm!==S.name&&!NAME_RE.test(nm);
+  $('#pe-in').classList.toggle('err',bad);
+  const f=$('#pe-fine');f.classList.toggle('bad',bad);
+  f.textContent=bad?'От 2 до 20 символов: буквы, цифры, пробел, точка, дефис':'Это имя и фото видят другие игроки в рейтинге и на рынке. Имя можно менять раз в 10 минут.';
+  const dirty=PE.resetName||PE.ava||PE.resetAva||nm!==S.name;
+  $('#pe-save').disabled=bad||!dirty||PE.busy;
+}
+function openProfileEdit(){
+  PE={ava:null,resetAva:false,resetName:false,busy:false};
+  $('#pe').innerHTML=`<div class="grab"></div><h4>Профиль</h4>
+    <div class="pe-av"><span id="pe-prev"></span>
+      <div class="pe-row"><button class="btn" id="pe-pick">Выбрать фото</button><button class="btn" id="pe-rmv">Убрать фото</button></div></div>
+    <input type="file" id="pe-file" accept="image/*" hidden>
+    <label class="pe-lb" for="pe-in">Имя</label>
+    <input class="pe-in" id="pe-in" maxlength="20" autocomplete="off" value="${esc(S.name||'')}" aria-label="Имя">
+    <button class="pe-lnk" id="pe-nm">Вернуть имя из Telegram</button>
+    <p class="fine" id="pe-fine"></p>
+    <button class="btn gold wide" id="pe-save" style="margin-top:14px">Сохранить</button>
+    <button class="btn wide" id="pe-close">Отмена</button>`;
+  $('#pe-pick').onclick=()=>$('#pe-file').click();
+  $('#pe-file').onchange=async e=>{
+    const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+    try{PE.ava=await readAvatar(f);PE.resetAva=false;pePaint();hapS()}
+    catch(err){toast('Не удалось открыть фото');hapN('error')}
+  };
+  $('#pe-rmv').onclick=()=>{if(PE.ava)PE.ava=null;else PE.resetAva=true;pePaint();hapS()};
+  $('#pe-nm').onclick=()=>{PE.resetName=true;$('#pe-in').value=S.tname||'';pePaint();hapS()};
+  $('#pe-in').oninput=()=>{PE.resetName=false;pePaint()};
+  $('#pe-close').onclick=()=>hide('#ov-pe');
+  $('#pe-save').onclick=peSave;
+  pePaint();show('#ov-pe');
+}
+function readAvatar(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{
+      try{
+        const w=im.naturalWidth,h=im.naturalHeight,s=Math.min(w,h),c=document.createElement('canvas');
+        if(!s)throw 0;
+        c.width=c.height=192;
+        const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,192,192);
+        x.drawImage(im,(w-s)/2,(h-s)/2,s,s,0,0,192,192);
+        let q=.85,d=c.toDataURL('image/jpeg',q);
+        while(d.length>60000&&q>.35){q-=.1;d=c.toDataURL('image/jpeg',q)}
+        URL.revokeObjectURL(url);res(d);
+      }catch(e){URL.revokeObjectURL(url);rej(e)}
+    };
+    im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('img'))};
+    im.src=url;
+  });
+}
+async function peSave(){
+  if(!PE||PE.busy)return;
+  const nm=$('#pe-in').value.replace(/\s+/g,' ').trim(),body={};
+  if(PE.resetName)body.resetName=true;else if(nm!==S.name)body.name=nm;
+  if(PE.ava)body.avatar=PE.ava;else if(PE.resetAva)body.resetAvatar=true;
+  if(!Object.keys(body).length){hide('#ov-pe');return}
+  PE.busy=true;pePaint();
+  try{
+    const r=await api('POST','/api/profile',body);
+    applyUser(r.user);paintHead();paintProfile();hide('#ov-pe');toast('Профиль обновлён');hapN('success');
+  }catch(e){
+    PE.busy=false;pePaint();
+    if(e.error==='namewait'){toast('Имя можно менять раз в 10 минут. Подождите '+fmtLeft(e.wait||6e5));hapN('error')}
+    else errToast(e);
+  }
+}
+$('#p-me').onclick=()=>{hapI();openProfileEdit()};
+$('#ov-pe').onclick=e=>{if(e.target.id==='ov-pe')hide('#ov-pe')};
+
+/* ---------- профиль другого игрока ---------- */
+async function openPlayer(id){
+  id=+id;if(!id)return;
+  $('#pl').innerHTML='<div class="grab"></div><div class="empty" style="padding:34px"><div class="spinner" style="margin:0 auto"></div></div>';
+  show('#ov-pl');
+  try{
+    const r=await api('GET','/api/player?id='+id);
+    if(!$('#ov-pl').classList.contains('on'))return;
+    const since=new Date(r.since).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
+    const w=r.wins||{},medals=[['🥇',w[1]],['🥈',w[2]],['🥉',w[3]]].filter(x=>x[1]>0);
+    $('#pl').innerHTML=`<div class="grab"></div>
+      <div class="pl-h">${avH(r)}<div style="min-width:0"><b>${esc(r.name)||'Игрок'}${r.me?' · вы':''}</b><small>В игре с ${since}</small></div></div>
+      <div class="pl-st"><div><small>Номеров</small><b>${fmt(r.n)}</b></div><div><small>Оценка гаража</small><b><i class="coin"></i>${fmt(r.total)}</b></div><div><small>Круток</small><b>${fmt(r.spins)}</b></div><div><small>Лучший номер</small><b><i class="coin"></i>${fmt(r.top[0]?r.top[0].v:0)}</b></div></div>
+      ${medals.length?`<div class="pl-w">${medals.map(m=>`<span>${m[0]} ×${m[1]}</span>`).join('')}</div>`:''}
+      <div class="sec" style="margin-top:16px;text-align:left">Лучшие номера</div>
+      ${r.top.map(p=>`<div class="pk r${p.rar}">${plateHTML(p,'11px')}<span class="meta"><span class="rl" style="display:block">${RAR[p.rar].n}</span><span class="val"><i class="coin"></i>${fmt(p.v)}</span></span></div>`).join('')||'<div class="empty" style="padding:18px">Гараж пока пуст</div>'}
+      ${r.me?'<button class="btn gold wide" id="pl-ed" style="margin-top:14px">Изменить профиль</button>':''}
+      <button class="btn wide" id="pl-x" style="margin-top:8px">Закрыть</button>`;
+    $('#pl-x').onclick=()=>hide('#ov-pl');
+    const ed=$('#pl-ed');if(ed)ed.onclick=()=>{hide('#ov-pl');openProfileEdit()};
+  }catch(e){hide('#ov-pl');errToast(e)}
+}
+$('#ov-pl').onclick=e=>{if(e.target.id==='ov-pl')hide('#ov-pl')};
+
+/* ---------- аукционы ---------- */
+let AUC={list:[],done:[],skew:0,max:3},aucIds=null,aLoad=0,aLast=0;
+const aNow=()=>Date.now()+AUC.skew;
+const cd=ms=>{
+  if(ms<=0)return'завершается…';
+  const s=Math.ceil(ms/1000);
+  return s>=3600?Math.floor(s/3600)+' ч '+Math.floor(s%3600/60)+' мин':Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+};
+async function loadAuc(manual){
+  const my=++aLoad;aLast=Date.now();
+  try{
+    const r=await api('GET','/api/auctions');
+    if(my!==aLoad)return;
+    AUC={list:r.list,done:r.done,skew:r.now-Date.now(),max:r.max};
+    aucIds=new Set(r.list.filter(a=>a.mine).map(a=>a.plate.id));
+    S.aucN=r.list.filter(a=>a.mine||a.leading).length;
+    let ch=false;S.inv.forEach(p=>{if(aucIds.has(p.id)&&p.st!=='listed'){p.st='listed';ch=true}});
+    if(ch)renderGarage();
+    paintMCount();renderAuc();
+  }catch(e){if(manual||e.error==='auth')errToast(e)}
+}
+function aucCard(a){
+  const p=a.plate,left=a.ends-aNow(),cur=a.bids?a.bid:a.start;
+  const who=a.bids?(a.leading?'<span class="lead">Вы лидируете</span>':'Лидер: '+esc(a.leader&&a.leader.name||'Игрок')):'Ставок пока нет';
+  let act;
+  if(a.mine)act=a.bids?'<button class="buy dim" disabled>Идут торги</button>':`<button class="rm" data-cancel="${a.id}">Снять</button>`;
+  else if(a.leading)act='<button class="buy dim" disabled>Лидируете</button>';
+  else act=`<button class="buy" data-bid="${a.id}">Ставка</button>`;
+  return `<div class="lot aucl r${p.rar}" data-id="${a.id}">
+    <div class="tp">${plateHTML(p,'14px')}<span class="bdg a t" data-end="${a.ends}">${cd(left)}</span></div>
+    <div class="bt"><div style="min-width:0">
+      <button class="slp" data-p="${a.seller.id}">${avH(a.seller)}<span><u>${esc(a.seller.name)||'Игрок'}</u> · ${p.regName}</span></button>
+      <div class="pr"><i class="coin"></i>${fmt(cur)}</div>
+      <div class="ev">${a.bids?a.bids+' '+plural(a.bids,'ставка','ставки','ставок')+' · ':'Старт · '}${who}</div>
+      <div class="ev">Оценка ${fmt(p.v)}${a.mine&&a.bids?' · вы получите '+fmt(Math.floor(a.bid*(100-COMM)/100)):''}</div>
+    </div>${act}</div></div>`;
+}
+function aucDone(a){
+  const p=a.plate;
+  const t=a.st==='sold'?(a.mine?`Продан за ${fmt(a.bid)} · +${fmt(a.net)}`:`Вы выиграли за ${fmt(a.bid)}`):(a.mine?'Ставок не было, номер вернулся в гараж':'Торги завершены');
+  const b=a.st==='sold'?(a.mine?'Продано':'Выиграно'):'Без ставок';
+  return `<div class="lot sold"><div>${plateHTML(p,'12px')}<div class="sl2" style="margin-top:8px">${t}</div></div><span class="bdg ${a.st==='sold'?'g':'a'}" style="display:inline-flex">${b}</span></div>`;
+}
+function renderAuc(){
+  const el=$('#au-list');if(!el)return;
+  const mn=AUC.list.filter(a=>a.mine),ot=AUC.list.filter(a=>!a.mine);
+  let h='<p class="fine" style="margin:0 0 4px">Побеждает самая высокая ставка. Монеты списываются сразу, а если ставку перебьют — вернутся. Ставка в последние 2 минуты продлевает торги.</p>';
+  if(mn.length)h+='<div class="sec aus">Мои аукционы</div><div style="margin-top:10px">'+mn.map(aucCard).join('')+'</div>';
+  h+='<div class="sec aus">Идут сейчас</div><div style="margin-top:10px">'+(ot.map(aucCard).join('')||'<div class="empty" style="padding:22px"><b>Аукционов нет</b>Запустите свой: кнопка «+» справа вверху.</div>')+'</div>';
+  if(AUC.done.length)h+='<div class="sec aus">Завершённые</div><div style="margin-top:10px">'+AUC.done.map(aucDone).join('')+'</div>';
+  el.innerHTML=h;
+}
+$('#au-list').onclick=async e=>{
+  const sp=e.target.closest('.slp');if(sp){openPlayer(sp.dataset.p);return}
+  const bb=e.target.closest('[data-bid]');if(bb){openBid(bb.dataset.bid);return}
+  const cb=e.target.closest('[data-cancel]');
+  if(cb&&!cb.disabled){
+    if(!arm(cb,'Снять?'))return;
+    cb.disabled=true;
+    try{await api('POST','/api/auction/cancel',{id:cb.dataset.cancel});toast('Аукцион снят');hapI();refreshMe()}
+    catch(err){errToast(err)}
+    loadAuc();
+  }
+};
+let BID=null;
+const BQ=[['Минимум',0],['+10%',.1],['+25%',.25],['+50%',.5]];
+const bidAmt=k=>Math.ceil(BID.a.min*(1+k));
+function openBid(id){
+  const a=AUC.list.find(x=>x.id===id);if(!a)return;
+  BID={a,amt:a.min,busy:false};
+  $('#ab').innerHTML=`<div class="grab"></div><h4>Ставка</h4>
+    <div style="display:flex;justify-content:center;margin:8px 0 12px">${plateHTML(a.plate,'min(24px,6.2vw)',true)}</div>
+    <div class="calc" style="margin:0 0 12px"><div>${a.bids?'Текущая ставка':'Стартовая цена'}<b><i class="coin"></i>${fmt(a.bids?a.bid:a.start)}</b></div><div>Минимум<b><i class="coin"></i><span id="ab-min"></span></b></div><div>Ваш баланс<b><i class="coin"></i><span id="ab-bal"></span></b></div></div>
+    <div class="pin" id="ab-pin"><i class="coin"></i><input id="ab-in" inputmode="numeric" autocomplete="off" aria-label="Ставка"></div>
+    <div class="qchips" id="ab-q">${BQ.map((q,i)=>`<button class="qc" data-i="${i}">${q[0]}</button>`).join('')}</div>
+    <p class="fine" id="ab-fine"></p>
+    <button class="btn gold wide" id="ab-go" style="margin-top:14px"></button>
+    <button class="btn wide" id="ab-x">Закрыть</button>`;
+  const inp=$('#ab-in');inp.value=fmt(BID.amt);
+  inp.oninput=()=>{const d=inp.value.replace(/\D/g,'').slice(0,9);BID.amt=+d||0;inp.value=d?fmt(+d):'';paintBid()};
+  $('#ab-q').onclick=e=>{const b=e.target.closest('.qc');if(!b)return;BID.amt=bidAmt(BQ[+b.dataset.i][1]);inp.value=fmt(BID.amt);paintBid();hapS()};
+  $('#ab-x').onclick=()=>hide('#ov-ab');
+  $('#ab-go').onclick=doBid;
+  paintBid();show('#ov-ab');
+}
+function paintBid(){
+  const{a,amt}=BID,low=amt<a.min,poor=amt>S.coins,ok=!low&&!poor;
+  $('#ab-min').textContent=fmt(a.min);$('#ab-bal').textContent=fmt(S.coins);
+  $('#ab-pin').classList.toggle('err',!ok&&amt>0);
+  const f=$('#ab-fine');f.classList.toggle('bad',!ok);
+  f.textContent=low?'Минимальная ставка — '+fmt(a.min):poor?'Не хватает монет':'Монеты спишутся сразу. Если вас перебьют, они вернутся на счёт.';
+  const g=$('#ab-go');g.disabled=!ok||BID.busy;g.textContent=ok?'Поставить '+fmt(amt):low?'Ставка ниже минимума':'Не хватает монет';
+  document.querySelectorAll('#ab-q .qc').forEach((b,i)=>b.classList.toggle('on',amt===bidAmt(BQ[i][1])));
+}
+async function doBid(){
+  if(!BID||BID.busy)return;BID.busy=true;paintBid();
+  const{a,amt}=BID;
+  try{
+    const r=await api('POST','/api/auction/bid',{id:a.id,amount:amt});
+    S.coins=r.coins;setCoins(S.coins);
+    Object.assign(a,{bid:r.bid,bids:a.bids+1,leading:true,leader:{id:S.uid,name:S.name},ends:r.ends,min:r.min});
+    S.aucN=AUC.list.filter(x=>x.mine||x.leading).length;paintMCount();
+    hide('#ov-ab');renderAuc();toast('Ставка принята');hapN('success');
+  }catch(e){
+    BID.busy=false;
+    if(e.error==='low'&&e.min){a.min=e.min;BID.amt=Math.max(BID.amt,e.min);$('#ab-in').value=fmt(BID.amt);paintBid();toast('Ставку уже перебили. Минимум — '+fmt(e.min));hapN('error');loadAuc()}
+    else if(e.error==='lead'){hide('#ov-ab');toast('Вы уже лидируете');loadAuc()}
+    else if(e.error==='gone'){hide('#ov-ab');errToast(e);loadAuc();refreshMe()}
+    else{paintBid();errToast(e);if(e.error==='coins')refreshMe()}
+  }
+}
+$('#ov-ab').onclick=e=>{if(e.target.id==='ov-ab')hide('#ov-ab')};
+setInterval(()=>{
+  if(msub!=='auc'||!$('#t-market').classList.contains('on')||document.hidden)return;
+  let ended=false;
+  document.querySelectorAll('#au-list [data-end]').forEach(el=>{const l=+el.dataset.end-aNow();el.textContent=cd(l);if(l<=0)ended=true});
+  if(ended&&Date.now()-aLast>4000)loadAuc().then(()=>refreshMe());
+},1000);
 
 /* ---------- админ-панель ---------- */
 const AD={tab:'stats',q:'',busy:false};
@@ -1990,13 +2322,14 @@ async function openRef(){
 $('#ov-rf').onclick=e=>{if(e.target.id==='ov-rf')hide('#ov-rf')};
 $('#p-ref').onclick=()=>{hapI();openRef()};
 
-let TOPT='val';
+let TOPT='wk';
 function openTop(){
   $('#top').innerHTML=`<div class="ph"><h2 style="font-size:22px">Рейтинг</h2><button class="xbtn" id="top-x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
-    <div class="aseg" role="tablist" aria-label="Раздел рейтинга"><button data-t="val" class="${TOPT==='val'?'on':''}">По стоимости гаража</button><button data-t="pl" class="${TOPT==='pl'?'on':''}">Лучшие номера</button></div>
+    <div class="aseg" role="tablist" aria-label="Раздел рейтинга">${[['wk','Неделя'],['val','Гараж'],['pl','Номера']].map(t=>`<button data-t="${t[0]}" class="${TOPT===t[0]?'on':''}">${t[1]}</button>`).join('')}</div>
     <div id="top-b"></div>`;
   $('#top-x').onclick=()=>hide('#ov-top');
   $('#top .aseg').onclick=e=>{const b=e.target.closest('button');if(!b)return;hapS();TOPT=b.dataset.t;document.querySelectorAll('#top .aseg button').forEach(x=>x.classList.toggle('on',x===b));paintTop()};
+  $('#top-b').onclick=e=>{const r=e.target.closest('.rk[data-id]');if(r){hapS();openPlayer(r.dataset.id)}};
   show('#ov-top');loadTop();
 }
 let TOPD=null;
@@ -2005,14 +2338,28 @@ async function loadTop(){
   try{TOPD=await api('GET','/api/top');paintTop()}
   catch(e){errToast(e);if($('#top-b'))$('#top-b').innerHTML='<div class="empty"><b>Не загрузилось</b><button class="btn sec2" id="top-re" style="margin-top:12px;height:44px">Повторить</button></div>';const r=$('#top-re');if(r)r.onclick=loadTop}
 }
+function rkRow(r,i,sub,right){
+  return `<div class="rk go${r.me?' me':''}" data-id="${r.id}"><span class="n">${i}</span>${avH(r)}<div class="nm">${esc(r.name)||'Игрок'}${sub?`<small>${sub}</small>`:''}</div>${right}</div>`;
+}
+const coinSm=n=>`<div class="sm"><i class="coin"></i>${fmt(n)}</div>`;
+const MEDAL=['🥇','🥈','🥉'];
 function paintTop(){
   if(!TOPD||!$('#top-b'))return;
   const d=TOPD;let h='';
-  if(TOPT==='val'){
-    h=d.value.map((r,i)=>`<div class="rk${r.me?' me':''}"><span class="n">${i+1}</span><div class="nm">${esc(r.name)||'Игрок'}<small>${r.n} ${plural(r.n,'номер','номера','номеров')}</small></div><div class="sm"><i class="coin"></i>${fmt(r.s)}</div></div>`).join('');
+  const cnt=n=>`${n} ${plural(n,'номер','номера','номеров')}`;
+  if(TOPT==='wk'){
+    const w=d.week,left=w.end-Date.now();
+    h=`<div class="wkc"><div class="t"><span>Призы недели</span><b>${left>0?'ещё '+fmtLeft(left):'подводим итоги'}</b></div>
+      <div class="pz">${w.prizes.map((p,i)=>`<div>${MEDAL[i]} ${fmt(p)}<small>${i+1} место</small></div>`).join('')}</div>
+      <p class="fine" style="margin:10px 0 0">Считается стоимость номеров, которые выпали вам на этой неделе. Итоги в понедельник, монеты придут сами.</p></div>`;
+    h+=w.list.length?w.list.map((r,i)=>rkRow(r,i+1,cnt(r.n),coinSm(r.s))).join(''):'<div class="empty" style="padding:30px">На этой неделе ещё никто не крутил. Будьте первым.</div>';
+    h+=`<div class="rkme">${w.me.n?`Вы ${w.me.rank?`на <b>${w.me.rank}</b> месте · `:''}за неделю <b>${fmt(w.me.s)}</b>`:'Выбейте номер на этой неделе, чтобы попасть в таблицу'}</div>`;
+    if(w.last&&w.last.length)h+=`<div class="sec" style="margin-top:20px">Победители прошлой недели</div>`+w.last.map(r=>rkRow(r,MEDAL[r.place-1]||r.place,'+'+fmt(r.prize)+' монет',coinSm(r.s))).join('');
+  }else if(TOPT==='val'){
+    h=d.value.map((r,i)=>rkRow(r,i+1,cnt(r.n),coinSm(r.s))).join('');
     h+=`<div class="rkme">${d.me.n?`Вы на <b>${d.me.rank}</b> месте · гараж на <b>${fmt(d.me.s)}</b>`:'Выпадите в рулетке, чтобы попасть в рейтинг'}</div>`;
   }else{
-    h=d.plates.map((r,i)=>`<div class="rk${r.me?' me':''}"><span class="n">${i+1}</span><div class="pw">${plateHTML(r.plate,'11px')}</div><div class="nm" style="margin-left:4px">${esc(r.name)||'Игрок'}</div><div class="sm"><i class="coin"></i>${fmt(r.plate.v)}</div></div>`).join('');
+    h=d.plates.map((r,i)=>`<div class="rk go${r.me?' me':''}" data-id="${r.id}"><span class="n">${i+1}</span><div class="pw">${plateHTML(r.plate,'11px')}</div><div class="nm" style="margin-left:4px">${esc(r.name)||'Игрок'}</div>${coinSm(r.plate.v)}</div>`).join('');
   }
   $('#top-b').innerHTML=h||'<div class="empty" style="padding:30px">Пока никого.</div>';
 }
@@ -2051,7 +2398,9 @@ $('#p-ach').onclick=()=>{hapI();openAch()};
 
 /* ---------- вкладки ---------- */
 function paintProfile(){
-  $('#p-name').textContent=(user&&user.first_name)||'Игрок';
+  const nm=S.name||(user&&user.first_name)||'Игрок';
+  $('#p-name').textContent=nm;
+  $('#p-avw').innerHTML=avH({ava:S.ava!=null?S.ava:(user&&user.photo_url),name:nm});
   $('#p-spins').textContent=fmt(S.spins);
   $('#p-count').textContent=S.inv.length;
   $('#p-total').textContent=fmt(S.inv.reduce((a,p)=>a+p.v,0));
@@ -2068,7 +2417,7 @@ function go(name){
   document.querySelectorAll('.bar button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
   $('#main').scrollTop=0;
   if(name==='garage')renderGarage();
-  if(name==='market'){renderMarket();msub==='all'?loadMarket():loadMine()}
+  if(name==='market'){renderMarket();loadSub();if(msub==='auc')refreshMe()}
   if(name==='profile')paintProfile();
   if(name==='spin'&&!spinning)requestAnimationFrame(remeasure);
   hapS();
@@ -2094,7 +2443,7 @@ document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault
 /* ---------- старт ---------- */
 try{document.fonts&&document.fonts.ready.then(()=>{if(!spinning&&slots.length)remeasure();document.querySelectorAll('.plate:not(.slots)').forEach(p=>p._fk=null);queueFit()})}catch(e){}
 function applyMe(d){
-  const u=d.user;
+  const u=d.user;applyUser(u);
   S.coins=u.coins;S.spins=u.spins;S.daily=d.daily;S.wheel=d.wheel;S.reset=d.reset;S.inv=d.inv;S.lotsN=d.lots;S.admin=!!u.admin;
   if(u.subWarn&&!S._sw){S._sw=1;setTimeout(()=>toast('Бот не админ канала: проверка подписки не работает'),800)}
   setCoins(S.coins,true);paintHead();paintGift();renderGarage();paintMCount();paintProfile();

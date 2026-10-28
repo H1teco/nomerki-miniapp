@@ -1,15 +1,15 @@
 /* Номерки — сервер игры. Cloudflare Worker + D1. Секрет: BOT_TOKEN. Привязка D1: DB. */
 const rnd=n=>Math.floor(Math.random()*n), pick=a=>a[rnd(a.length)], R=(a,b)=>a+rnd(b-a+1);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-const BONUS=1500, START_COINS=20000, SELL=.8;
+const BONUS=1500, START_COINS=20000, SELL=.85;
 const RAR=[{n:'Обычный'},{n:'Необычный'},{n:'Редкий'},{n:'Эпичный'},{n:'Легендарный'},{n:'Мифический'}];
 /* рулетки: цена, нижняя граница качества и шансы [обычный … мифический] */
 const TIERS=[
-  {n:'Обычная',price:1000,note:'любые номера',w:[88,9,2.4,.5,.09,.01]},
-  {n:'Редкая',price:2500,note:'от необычных',w:[0,90,8,1.6,.35,.05]},
-  {n:'Эпическая',price:6000,note:'от редких',w:[0,0,90,8.3,1.5,.2]},
-  {n:'Элитная',price:15000,note:'от эпичных',w:[0,0,0,88,10.5,1.5]},
-  {n:'Легендарная',price:38000,note:'от легендарных',w:[0,0,0,0,95,5]}
+  {n:'Обычная',price:1000,note:'любые номера',w:[95.24,3.61,.96,.16,.02,.01]},
+  {n:'Редкая',price:2500,note:'от необычных',w:[0,92.52,6.17,1.09,.18,.04]},
+  {n:'Эпическая',price:7000,note:'от редких',w:[0,0,91.96,6.55,1.23,.25]},
+  {n:'Элитная',price:17500,note:'от эпичных',w:[0,0,0,92.02,6.88,1.1]},
+  {n:'Легендарная',price:42000,note:'от легендарных',w:[0,0,0,0,95.5,4.5]}
 ];
 const W_MARKET=[40,28,18,9,4,1];
 const rg=(codes,name,m)=>codes.map(c=>[c,name,m]);
@@ -48,12 +48,12 @@ const CMB={
 const KZ_BAN=new Set('AAM BOK CEX FBP HER KAL KOT MAL SOR SOP SOS SEX USA XER XYE ZEK GEY GEI GAY JID GON GAD CON QUM GOD EBI EPT IIM GOS IIN QAS OON XUI HUY ISK HYI QYS XUY JUN BOQ QUL SIK QAN SYK JUT QOR QYQ QOI TYQ JOI JMI JYN GAI IBU VOR EBU BOP FUK FAK FUC FAC IOX IOH LOX LOH COX KOX FBR POX KNB MVD OPG EBR AMM SGL ASS HAX NAX'.split(' '));
 /* пары (качество цифр, качество букв) для итогового качества номера; у высоких обе части — комбинации */
 const PAIRS=[
-  [[0,0]],
-  [[1,0],[0,1],[1,1]],
-  [[2,0],[0,2],[2,1],[1,2]],
-  [[3,1],[1,3],[2,2]],
-  [[3,2],[2,3],[3,3],[4,2],[2,4]],
-  [[4,3],[3,4],[4,4]]
+  [[0,0],[0,0],[0,1],[1,0]],
+  [[0,2],[2,0],[2,1],[1,2],[1,1]],
+  [[0,3],[2,2],[3,0],[1,3],[2,2]],
+  [[0,4],[3,1],[2,3],[4,0],[3,2],[1,4]],
+  [[4,1],[4,2],[2,4],[3,3],[3,2]],
+  [[3,4],[4,3],[4,4]]
 ];
 
 /* ---------- генератор номеров ---------- */
@@ -99,10 +99,10 @@ function digitTag(d){
   if(/^[1-9]00$/.test(d))return 'Круглая сотня';
   if(d.length===4&&/^000\d$/.test(d))return 'Нули впереди';
   if(['0123','1234'].includes(d)||isSeq(d))return 'Лесенка';
+  if(/^0[1-9]0$/.test(d)||d==='707'||d==='077')return 'Красивые нули';
   if(d===[...d].reverse().join(''))return 'Зеркало';
   if(/^(\d\d)\1$/.test(d))return 'Повтор';
   if(/(\d)\1(\d)\2/.test(d))return 'Две пары';
-  if(/^0[1-9]0$/.test(d)||d==='707'||d==='077')return 'Красивые нули';
   if(/^00\d\d$/.test(d))return 'Два нуля';
   if(/(\d)\1/.test(d))return 'Пара';
   if(/00$/.test(d))return 'Круглый';
@@ -122,8 +122,16 @@ function dupL(c,n,excl){
 }
 const nice=v=>v<1000?Math.round(v/10)*10:v<10000?Math.round(v/50)*50:v<100000?Math.round(v/500)*500:Math.round(v/1000)*1000;
 /* ---------- оценка: единица × цифры × буквы × регион ---------- */
-const UNIT=600;
-const LMULT=[1,1.5,2.6,5,10];
+const UNIT=700;
+/* множитель букв по качеству серии; отдельные «топовые» серии ценятся выше (по реальным ценникам: АМР, ААА, ТТТ и т.д.) */
+const LMULT=[1,1.6,2.5,6,12];
+const LTOP={
+  KZ:{AAA:16,AMG:14,VIP:13,BMW:13,MMM:14,SSS:14,XXX:14,ZZZ:14},
+  RU:{'АМР':30,'ЕКХ':24,'ААА':20,'МММ':18,'ООО':18,'ССС':16,'ММР':18,'ВМР':16,'ККК':14,'ТТТ':14,'ХХХ':14,'ВВВ':14,'ННН':14,'ВОР':9,'ХАМ':8,'МЕР':8,'АМО':10,'ААМ':9},
+  UA:{},
+  BY:{AA:12,MM:12,XX:12,OO:12}
+};
+const lmOf=(c,L,gl)=>(LTOP[c]&&LTOP[c][L])||LMULT[gl]||1;
 const ELITE_M={'777':22,'888':20,'999':18,'0001':28,'0007':26,'7777':40,'0777':16};
 /* границы редкости по оценке: ниже первой — обычный, выше последней — мифический */
 const TH=[1500,3600,9000,22000,60000];
@@ -131,16 +139,16 @@ const rarOf=v=>{let r=0;while(r<TH.length&&v>=TH[r])r++;return r};
 function digitMult(d){
   const n=d.length,t=digitTag(d);
   switch(t){
-    case 'Элитные цифры':return ELITE_M[d]||(/^00[1-9]$/.test(d)?12:14);
-    case 'Тройка':return 8;
-    case 'Четвёрка':return 14;
-    case 'Круглая сотня':return 6;
-    case 'Нули впереди':return 8;
-    case 'Лесенка':return n===3?4.5:7;
-    case 'Зеркало':return n===3?1.8:2.4;
+    case 'Элитные цифры':return ELITE_M[d]||(/^00[1-9]$/.test(d)?22:20);
+    case 'Тройка':return 13;
+    case 'Четвёрка':return 16;
+    case 'Круглая сотня':return 12;
+    case 'Нули впереди':return 10;
+    case 'Лесенка':return n===3?5:8;
+    case 'Зеркало':return n===3?1.5:2.4;
     case 'Повтор':return 2.2;
     case 'Две пары':return 2;
-    case 'Красивые нули':return 3;
+    case 'Красивые нули':return 5.5;
     case 'Два нуля':return 2.8;
     case 'Пара':return 1.3;
     case 'Круглый':return 2.4;
@@ -149,6 +157,9 @@ function digitMult(d){
 }
 function makePlate0(c,g){
   const [gd,gl]=pick(PAIRS[g]);
+  return makeByPair(c,gd,gl,g);
+}
+function makeByPair(c,gd,gl,g){
   const m=CMB[c],RG=C[c].reg,n=(c==='UA'||c==='BY')?4:3,caps=CAP[c];
   let reg,L,lt=null;
   if(c==='UA'){
@@ -181,7 +192,7 @@ function makePlate0(c,g){
   if(c==='UA'){p.pre=reg[0];p.suf=L}
   if(c==='BY')p.l=L;
   p.tags=[gd>0?digitTag(d):null,lt,reg[2]>=1.4?'Столичный регион':null].filter(Boolean);
-  const dm=digitMult(d),lm=LMULT[gl]||1,rm=reg[2];
+  const dm=digitMult(d),lm=lmOf(c,L,gl),rm=reg[2];
   p.mx=[dm,lm,rm];
   p.v=nice(UNIT*dm*lm*rm*(.95+Math.random()*.15));
   return p;
@@ -232,30 +243,34 @@ const DDL=[
  `CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY,v TEXT)`,
  `CREATE TABLE IF NOT EXISTS refs(user INTEGER PRIMARY KEY,ref INTEGER NOT NULL,at INTEGER NOT NULL,paid INTEGER NOT NULL DEFAULT 0)`,
  `CREATE INDEX IF NOT EXISTS refs_ref ON refs(ref,paid)`,
- `CREATE TABLE IF NOT EXISTS ach(user INTEGER NOT NULL,k TEXT NOT NULL,at INTEGER NOT NULL,claimed INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user,k))`
+ `CREATE TABLE IF NOT EXISTS ach(user INTEGER NOT NULL,k TEXT NOT NULL,at INTEGER NOT NULL,claimed INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user,k))`,
+ `CREATE TABLE IF NOT EXISTS weekly(week INTEGER NOT NULL,place INTEGER NOT NULL,user INTEGER NOT NULL,prize INTEGER NOT NULL,val INTEGER NOT NULL,PRIMARY KEY(week,place))`,
+ `CREATE TABLE IF NOT EXISTS auctions(id TEXT PRIMARY KEY,plate_id TEXT NOT NULL,seller INTEGER NOT NULL,start INTEGER NOT NULL,bid INTEGER NOT NULL DEFAULT 0,bidder INTEGER,bids INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,ends INTEGER NOT NULL,st TEXT NOT NULL DEFAULT 'active',c TEXT,rar INTEGER,v INTEGER)`,
+ `CREATE INDEX IF NOT EXISTS auctions_act ON auctions(st,ends)`,
+ `CREATE INDEX IF NOT EXISTS auctions_seller ON auctions(seller,st)`,
+ `CREATE INDEX IF NOT EXISTS plates_created ON plates(created)`
 ];
 let ready=null,lastClean=0;
-const MIG=['ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN streak INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN last_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wheel_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN notify INTEGER NOT NULL DEFAULT 1','ALTER TABLE users ADD COLUMN remind_day INTEGER NOT NULL DEFAULT 0'];
+const MIG=['ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN streak INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN last_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN wheel_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN notify INTEGER NOT NULL DEFAULT 1','ALTER TABLE users ADD COLUMN remind_day INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN dname TEXT','ALTER TABLE users ADD COLUMN photo TEXT','ALTER TABLE users ADD COLUMN avatar TEXT','ALTER TABLE users ADD COLUMN av INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN name_at INTEGER NOT NULL DEFAULT 0','ALTER TABLE users ADD COLUMN uname TEXT'];
 /* одноразовая переоценка старых номеров по новой схеме (множители цифр × букв × региона) */
 function revalue(p){
   const c=p.c;if(!C[c]||!p.d)return null;
   const code=p.pre||p.reg,rg=C[c].reg.find(r=>r[0]===code),rm=rg?rg[2]:1;
   const tg=(p.tags||[]).join('|');
-  let gl=0;const m=/Серия ([^|\s]+)/.exec(tg);
+  let gl=0,L=null;const m=/Серия ([^|\s]+)/.exec(tg);
   if(/Минск · двойные/.test(tg))gl=3;
   else if(/Буквы как у региона/.test(tg))gl=(CAP[c]||[]).includes(code)?4:3;
-  else if(m){const x=m[1];gl=(CMB[c].g4||[]).includes(x)?4:(CMB[c].g3||[]).includes(x)?3:2}
+  else if(m){const x=m[1];L=x;gl=(CMB[c].g4||[]).includes(x)?4:(CMB[c].g3||[]).includes(x)?3:2}
   else if(/Двойные буквы/.test(tg))gl=1;
-  const dm=digitMult(p.d),lm=LMULT[gl]||1,v=nice(UNIT*dm*lm*rm*(.95+Math.random()*.15));
+  const dm=digitMult(p.d),lm=lmOf(c,L,gl),v=nice(UNIT*dm*lm*rm*(.95+Math.random()*.15));
   return{mx:[dm,lm,rm],v,rar:rarOf(v)};
 }
-async function econV2(env){
+async function econV3(env){
   const cur=await env.DB.prepare("SELECT v FROM meta WHERE k='econ'").first();
-  if(cur&&cur.v==='v2')return;
+  if(cur&&cur.v==='v3')return;
   const rows=(await env.DB.prepare('SELECT id,data FROM plates').all()).results,st=[];
   for(const r of rows){
     let p;try{p=JSON.parse(r.data)}catch(e){continue}
-    if(p.mx)continue;
     const re=revalue(p);if(!re)continue;
     p.mx=re.mx;p.v=re.v;p.rar=re.rar;
     st.push(env.DB.prepare('UPDATE plates SET rar=?,v=?,data=? WHERE id=?').bind(re.rar,re.v,JSON.stringify(p),r.id));
@@ -264,7 +279,7 @@ async function econV2(env){
   await env.DB.batch([
     env.DB.prepare("UPDATE lots SET rar=(SELECT rar FROM plates WHERE id=lots.plate_id),v=(SELECT v FROM plates WHERE id=lots.plate_id) WHERE st='active'"),
     env.DB.prepare("UPDATE lots SET price=CAST(v*"+SELL+"+1 AS INTEGER) WHERE st='active' AND price<CAST(v*"+SELL+"+1 AS INTEGER)"),
-    env.DB.prepare("INSERT INTO meta(k,v) VALUES('econ','v2') ON CONFLICT(k) DO UPDATE SET v=excluded.v")
+    env.DB.prepare("INSERT INTO meta(k,v) VALUES('econ','v3') ON CONFLICT(k) DO UPDATE SET v=excluded.v")
   ]);
 }
 const init=env=>ready||(ready=(async()=>{
@@ -276,7 +291,7 @@ const init=env=>ready||(ready=(async()=>{
     env.DB.prepare("DELETE FROM plates WHERE owner=0")
   ]);
   /* реестр уникальных номеров: однажды выданный номер больше не выпадет никому, даже после продажи системе */
-  await econV2(env);
+  await econV3(env);
   await env.DB.prepare("INSERT OR IGNORE INTO issued(k,ts) SELECT c||'|'||COALESCE(json_extract(data,'$.d'),'')||'|'||COALESCE(json_extract(data,'$.l'),'')||'|'||COALESCE(json_extract(data,'$.l1'),'')||'|'||COALESCE(json_extract(data,'$.l2'),'')||'|'||COALESCE(json_extract(data,'$.pre'),'')||'|'||COALESCE(json_extract(data,'$.suf'),'')||'|'||COALESCE(json_extract(data,'$.reg'),''),created FROM plates WHERE NOT EXISTS(SELECT 1 FROM issued LIMIT 1)").run();
 })().catch(e=>{ready=null;throw e}));
 /* админы: Telegram ID через запятую (переменная ADMIN_IDS либо значение по умолчанию) */
@@ -303,22 +318,30 @@ async function auth(req,env){
   if(Date.now()/1000-(+p.get('auth_date')||0)>3*86400)throw new HttpErr(401,'expired');
   let u=null;try{u=JSON.parse(p.get('user')||'null')}catch(e){}
   if(!u||!u.id)throw new HttpErr(401,'auth');
-  return{id:u.id,name:u.username?'@'+u.username:(u.first_name||'Игрок')};
+  const nm=String(u.first_name||u.username||'Игрок').replace(/[\u0000-\u001f]/g,'').trim().slice(0,40)||'Игрок';
+  const ph=/^https:\/\/[^\s]{1,300}$/.test(String(u.photo_url||''))?String(u.photo_url):'';
+  const un=/^[A-Za-z0-9_]{3,40}$/.test(String(u.username||''))?String(u.username):'';
+  return{id:u.id,name:nm,photo:ph,un};
 }
 async function getUser(env,a,now){
-  let u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at,banned,streak,last_day,wheel_day FROM users WHERE id=?').bind(a.id).first();
+  const SEL='SELECT id,name,coins,spins,bonus_at,banned,streak,last_day,wheel_day,dname,photo,av,name_at,uname FROM users WHERE id=?';
+  let u=await env.DB.prepare(SEL).bind(a.id).first();
   if(!u){
-    await env.DB.prepare('INSERT OR IGNORE INTO users(id,name,coins,created) VALUES(?,?,?,?)').bind(a.id,a.name,START_COINS,now).run();
-    u=await env.DB.prepare('SELECT id,name,coins,spins,bonus_at,banned,streak,last_day,wheel_day FROM users WHERE id=?').bind(a.id).first();
-  }else if(u.name!==a.name){
-    await env.DB.prepare('UPDATE users SET name=? WHERE id=?').bind(a.name,a.id).run();u.name=a.name;
+    await env.DB.prepare('INSERT OR IGNORE INTO users(id,name,coins,created,photo,uname) VALUES(?,?,?,?,?,?)').bind(a.id,a.name,START_COINS,now,a.photo,a.un).run();
+    u=await env.DB.prepare(SEL).bind(a.id).first();
+  }else if(u.name!==a.name||(u.photo||'')!==a.photo||(u.uname||'')!==a.un){
+    await env.DB.prepare('UPDATE users SET name=?,photo=?,uname=? WHERE id=?').bind(a.name,a.photo,a.un,a.id).run();u.name=a.name;u.photo=a.photo;u.uname=a.un;
   }
   return u;
 }
 const strip=p=>{const{id,paid,...r}=p;return r};
 const plateOf=r=>({...JSON.parse(r.data),id:r.id,st:r.st,t:r.created});
 const lotPlate=r=>({...JSON.parse(r.data),id:r.plate_id});
-const userOut=(u,env)=>({id:u.id,name:u.name,coins:u.coins,spins:u.spins,admin:isAdmin(env,u.id)});
+/* отображаемое имя: своё из профиля, иначе имя из Telegram */
+const dnOf=u=>(u.dname&&String(u.dname).trim())||u.name||'Игрок';
+const NAME_SQL=a=>`COALESCE(NULLIF(${a}.dname,''),${a}.name)`;
+const avaOf=u=>u.av?`/api/ava/${u.id}?v=${u.av}`:(u.photo||'');
+const userOut=(u,env)=>({id:u.id,name:dnOf(u),tname:u.name,custom:!!(u.dname&&String(u.dname).trim()),hasAva:!!u.av,ava:avaOf(u),coins:u.coins,spins:u.spins,admin:isAdmin(env,u.id)});
 const REF_NEW=5000,REF_BONUS=15000,REF_MAX=50;
 const BOT_USER='LayerPlates_bot';
 const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -350,7 +373,7 @@ async function refPay(env,u,now){
   if(pay)st.push(env.DB.prepare('UPDATE users SET coins=coins+? WHERE id=?').bind(REF_BONUS,r.ref));
   await env.DB.batch(st);
   u.coins+=REF_NEW;
-  if(pay)bg(notify(env,r.ref,`👥 По вашей ссылке пришёл ${esc(u.name)}. Начислено <b>+${fmtN(REF_BONUS)}</b> монет.`));
+  if(pay)bg(notify(env,r.ref,`👥 По вашей ссылке пришёл ${esc(dnOf(u))}. Начислено <b>+${fmtN(REF_BONUS)}</b> монет.`));
   return REF_NEW;
 }
 /* достижения: награда забирается вручную; выполненные фиксируются сразу, чтобы прогресс не терялся после продажи номера */
@@ -374,7 +397,7 @@ const ACH=[
 async function achMetrics(env,u){
   const[pl,sold,fr,us]=await Promise.all([
     env.DB.prepare("SELECT COUNT(*) n,COUNT(DISTINCT c) cc,COALESCE(SUM(rar>=2),0) r2,COALESCE(SUM(rar>=3),0) r3,COALESCE(SUM(rar>=4),0) r4,COALESCE(SUM(rar>=5),0) r5,COALESCE(SUM(COALESCE(json_extract(data,'$.mx[0]'),0)>=10),0) dm10 FROM plates WHERE owner=?").bind(u.id).first(),
-    env.DB.prepare("SELECT COUNT(*) n FROM lots WHERE seller=? AND st='sold'").bind(u.id).first(),
+    env.DB.prepare("SELECT (SELECT COUNT(*) FROM lots WHERE seller=? AND st='sold')+(SELECT COUNT(*) FROM auctions WHERE seller=? AND st='sold') n").bind(u.id,u.id).first(),
     env.DB.prepare("SELECT COUNT(*) n FROM refs WHERE ref=? AND paid=1").bind(u.id).first(),
     env.DB.prepare("SELECT spins,streak FROM users WHERE id=?").bind(u.id).first()
   ]);
@@ -415,7 +438,7 @@ async function sendBroadcast(env,ids,text){
   }
   console.log('broadcast done',ok,bad);
 }
-let topCache={t:0,d:null};
+let topCache={t:0,w:0,d:null};
 function dailyOf(u,now){
   const t=dayNum(now);
   if(u.last_day===t)return{rewards:REWARDS,claimed:true,done:u.streak,next:null};
@@ -437,8 +460,11 @@ async function housekeeping(env,now){
     D.prepare("UPDATE lots SET st='expired' WHERE st='active' AND expires<?").bind(now),
     D.prepare("UPDATE plates SET st='own' WHERE st='listed' AND id IN(SELECT plate_id FROM lots WHERE st='expired' AND settled=0)"),
     D.prepare("UPDATE lots SET settled=1 WHERE st='expired' AND settled=0"),
-    D.prepare("DELETE FROM lots WHERE st!='active' AND settled=1 AND created<?").bind(now-30*DAY)
+    D.prepare("DELETE FROM lots WHERE st!='active' AND settled=1 AND created<?").bind(now-30*DAY),
+    D.prepare("DELETE FROM auctions WHERE st!='active' AND ends<?").bind(now-14*DAY)
   ]);
+  try{await weeklyPrizes(env,now)}catch(e){console.log('weekly',e&&e.message)}
+  await settleAuctions(env,now);
 }
 /* уникальный номер: ключ резервируется в реестре навсегда; при нехватке свободных комбинаций качество понижается */
 const plateKey=p=>[p.c,p.d,p.l||'',p.l1||'',p.l2||'',p.pre||'',p.suf||'',p.reg||''].join('|');
@@ -458,6 +484,69 @@ async function claimPlate(env,c,g,now){
   throw new HttpErr(503,'exhausted');
 }
 const int=(x,lo,hi)=>{x=Math.floor(+x);if(!Number.isFinite(x)||x<lo||x>hi)throw new HttpErr(400,'bad');return x};
+
+
+/* ---------- призы недели ---------- */
+const weekOf=t=>Math.floor((dayNum(t)+3)/7);          /* неделя начинается в понедельник (Астана) */
+const weekStart=w=>(7*w-3)*DAY-TZ;
+const PRIZES=[100000,50000,25000];
+const NAME_CD=6e5;
+async function weeklyPrizes(env,now){
+  const w=weekOf(now);
+  const cur=await env.DB.prepare("SELECT v FROM meta WHERE k='prize_week'").first();
+  if(!cur){await env.DB.prepare("INSERT OR IGNORE INTO meta(k,v) VALUES('prize_week',?)").bind(String(w)).run();return}
+  if(+cur.v>=w)return;
+  const g=await env.DB.prepare("UPDATE meta SET v=? WHERE k='prize_week' AND CAST(v AS INTEGER)<?").bind(String(w),w).run();
+  if(g.meta.changes!==1)return;
+  const pw=w-1,a=weekStart(pw),e=weekStart(w);
+  const top=(await env.DB.prepare("SELECT p.owner id,SUM(p.v) s FROM plates p JOIN users u ON u.id=p.owner WHERE p.created>=? AND p.created<? AND u.banned=0 GROUP BY p.owner ORDER BY s DESC LIMIT 3").bind(a,e).all()).results;
+  if(!top.length)return;
+  const st=[];
+  top.forEach((r,i)=>{
+    st.push(env.DB.prepare('INSERT OR IGNORE INTO weekly(week,place,user,prize,val) VALUES(?,?,?,?,?)').bind(pw,i+1,r.id,PRIZES[i],r.s));
+    st.push(env.DB.prepare('UPDATE users SET coins=coins+? WHERE id=? AND (SELECT changes())=1').bind(PRIZES[i],r.id));
+  });
+  await env.DB.batch(st);
+  top.forEach((r,i)=>bg(notify(env,r.id,`🏆 Итоги недели: вы заняли <b>${i+1} место</b> в рейтинге. Приз <b>+${fmtN(PRIZES[i])}</b> монет уже на счёте.`)));
+}
+/* ---------- аукционы ---------- */
+const AU_HOURS={1:36e5,6:216e5,24:DAY},MAX_AUC=3,AU_SNIPE=12e4;
+const aucMin=a=>a.bidder?a.bid+Math.max(50,Math.ceil(a.bid*.05)):a.start;
+const plateNm=async(env,id)=>{try{const r=await env.DB.prepare('SELECT data FROM plates WHERE id=?').bind(id).first();return r?plateText(JSON.parse(r.data)):'номер'}catch(e){return 'номер'}};
+async function settleAuctions(env,now){
+  const rows=(await env.DB.prepare("SELECT id,plate_id,seller,bid,bidder,bids FROM auctions WHERE st='active' AND ends<=? ORDER BY ends LIMIT 20").bind(now).all()).results;
+  for(const a of rows){
+    try{
+      if(a.bidder){
+        const net=Math.floor(a.bid*(100-COMM)/100);
+        const res=await env.DB.batch([
+          env.DB.prepare("UPDATE auctions SET st='sold' WHERE id=? AND st='active' AND ends<=? AND bids=? AND bidder=?").bind(a.id,now,a.bids,a.bidder),
+          env.DB.prepare('UPDATE users SET coins=coins+? WHERE id=? AND (SELECT changes())=1').bind(net,a.seller),
+          env.DB.prepare("UPDATE plates SET owner=?,st='own' WHERE id=? AND (SELECT changes())=1").bind(a.bidder,a.plate_id)
+        ]);
+        if(res[0].meta.changes===1){
+          const nm=esc(await plateNm(env,a.plate_id));
+          bg(notify(env,a.bidder,`🔨 Аукцион выигран: номер <b>${nm}</b> теперь в вашем гараже. Ставка ${fmtN(a.bid)}.`));
+          bg(notify(env,a.seller,`💰 Ваш номер <b>${nm}</b> ушёл с аукциона за ${fmtN(a.bid)}. Начислено <b>+${fmtN(net)}</b> монет.`));
+          bg(achSync(env,{id:a.seller},now));
+        }
+      }else{
+        const res=await env.DB.batch([
+          env.DB.prepare("UPDATE auctions SET st='unsold' WHERE id=? AND st='active' AND ends<=? AND bidder IS NULL").bind(a.id,now),
+          env.DB.prepare("UPDATE plates SET st='own' WHERE id=? AND (SELECT changes())=1").bind(a.plate_id)
+        ]);
+        if(res[0].meta.changes===1)bg(notify(env,a.seller,`⌛ Аукцион завершён без ставок: номер <b>${esc(await plateNm(env,a.plate_id))}</b> вернулся в гараж.`));
+      }
+    }catch(e){console.log('auc',e&&e.message)}
+  }
+}
+async function ava(env,url){
+  const id=+url.pathname.slice(9);
+  const r=Number.isFinite(id)?await env.DB.prepare('SELECT avatar FROM users WHERE id=?').bind(id).first():null;
+  if(!r||!r.avatar)return new Response('',{status:404,headers:{'cache-control':'no-store'}});
+  const bin=Uint8Array.from(atob(r.avatar),c=>c.charCodeAt(0));
+  return new Response(bin,{headers:{'content-type':'image/jpeg','cache-control':'public, max-age=86400'}});
+}
 
 const needAdmin=(env,u)=>{if(!isAdmin(env,u.id))throw new HttpErr(403,'forbidden')};
 const routes={
@@ -481,8 +570,8 @@ const routes={
   async 'GET /api/admin/users'(env,u,url,now){
     needAdmin(env,u);
     const qq=(url.searchParams.get('q')||'').trim().slice(0,40),like='%'+qq.replace(/[%_]/g,'')+'%';
-    const rows=(await env.DB.prepare("SELECT u.id,u.name,u.coins,u.spins,u.seen,u.banned,u.created,(SELECT COUNT(*) FROM plates p WHERE p.owner=u.id) pc FROM users u WHERE (?='' OR u.name LIKE ? OR CAST(u.id AS TEXT)=?) ORDER BY u.seen DESC LIMIT 40").bind(qq,like,qq).all()).results;
-    return{users:rows.map(r=>({id:r.id,name:r.name,coins:r.coins,spins:r.spins,seen:r.seen,banned:!!r.banned,created:r.created,plates:r.pc}))};
+    const rows=(await env.DB.prepare("SELECT u.id,COALESCE(NULLIF(u.dname,''),u.name) name,u.uname,u.coins,u.spins,u.seen,u.banned,u.created,(SELECT COUNT(*) FROM plates p WHERE p.owner=u.id) pc FROM users u WHERE (?='' OR u.name LIKE ? OR u.dname LIKE ? OR u.uname LIKE ? OR CAST(u.id AS TEXT)=?) ORDER BY u.seen DESC LIMIT 40").bind(qq,like,like,like,qq).all()).results;
+    return{users:rows.map(r=>({id:r.id,name:r.name,un:r.uname||'',coins:r.coins,spins:r.spins,seen:r.seen,banned:!!r.banned,created:r.created,plates:r.pc}))};
   },
   async 'POST /api/admin/grant'(env,u,url,now,b){
     needAdmin(env,u);
@@ -502,7 +591,7 @@ const routes={
   },
   async 'GET /api/admin/lots'(env,u,url,now){
     needAdmin(env,u);
-    const rows=(await env.DB.prepare("SELECT l.id,l.price,l.seller,l.seller_name,l.expires,l.v,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.st='active' ORDER BY l.created DESC LIMIT 60").all()).results;
+    const rows=(await env.DB.prepare("SELECT l.id,l.price,l.seller,(SELECT COALESCE(NULLIF(dname,''),name) FROM users WHERE id=l.seller) seller_name,l.expires,l.v,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.st='active' ORDER BY l.created DESC LIMIT 60").all()).results;
     return{lots:rows.map(r=>({id:r.id,price:r.price,seller:r.seller_name,sellerId:r.seller,expires:r.expires,plate:{...JSON.parse(r.data),id:r.pid}}))};
   },
   async 'POST /api/admin/cancel'(env,u,url,now,b){
@@ -563,21 +652,125 @@ const routes={
     return{link:`https://t.me/${BOT_USER}?start=ref_${u.id}`,count:r.n,earned:Math.min(r.n,REF_MAX)*REF_BONUS,bonus:REF_BONUS,newBonus:REF_NEW,max:REF_MAX};
   },
   async 'GET /api/top'(env,u,url,now){
-    if(now-topCache.t>3e4||!topCache.d){
-      const D=env.DB;
-      const[val,pl]=await Promise.all([
-        D.prepare("SELECT u.id,u.name,SUM(p.v) s,COUNT(*) n FROM plates p JOIN users u ON u.id=p.owner WHERE u.banned=0 GROUP BY p.owner ORDER BY s DESC LIMIT 20").all(),
-        D.prepare("SELECT p.data,p.id,u.id uid,u.name FROM plates p JOIN users u ON u.id=p.owner WHERE u.banned=0 ORDER BY p.v DESC LIMIT 20").all()
+    await housekeeping(env,now);
+    const w=weekOf(now),ws=weekStart(w),we=weekStart(w+1);
+    if(now-topCache.t>3e4||!topCache.d||topCache.w!==w){
+      const D=env.DB,N=NAME_SQL('u');
+      const[val,pl,wk,last]=await Promise.all([
+        D.prepare(`SELECT u.id,${N} name,u.av,u.photo,SUM(p.v) s,COUNT(*) n FROM plates p JOIN users u ON u.id=p.owner WHERE u.banned=0 GROUP BY p.owner ORDER BY s DESC LIMIT 20`).all(),
+        D.prepare(`SELECT p.data,p.id,u.id uid,${N} name,u.av,u.photo FROM plates p JOIN users u ON u.id=p.owner WHERE u.banned=0 ORDER BY p.v DESC LIMIT 20`).all(),
+        D.prepare(`SELECT u.id,${N} name,u.av,u.photo,SUM(p.v) s,COUNT(*) n FROM plates p JOIN users u ON u.id=p.owner WHERE p.created>=? AND u.banned=0 GROUP BY p.owner ORDER BY s DESC LIMIT 20`).bind(ws).all(),
+        D.prepare(`SELECT w.week,w.place,w.prize,w.val,u.id,${N} name,u.av,u.photo FROM weekly w JOIN users u ON u.id=w.user WHERE w.week=(SELECT MAX(week) FROM weekly) ORDER BY w.place`).all()
       ]);
-      topCache={t:now,d:{val:val.results,pl:pl.results}};
+      topCache={t:now,w,d:{val:val.results,pl:pl.results,wk:wk.results,last:last.results}};
     }
     const mine=await env.DB.prepare('SELECT COALESCE(SUM(v),0) s,COUNT(*) n FROM plates WHERE owner=?').bind(u.id).first();
     const rank=mine.n?(await env.DB.prepare('SELECT COUNT(*)+1 r FROM (SELECT owner FROM plates GROUP BY owner HAVING SUM(v)>?)').bind(mine.s).first()).r:null;
+    const mw=await env.DB.prepare('SELECT COALESCE(SUM(v),0) s,COUNT(*) n FROM plates WHERE owner=? AND created>=?').bind(u.id,ws).first();
+    const rw=mw.n?(await env.DB.prepare('SELECT COUNT(*)+1 r FROM (SELECT owner FROM plates WHERE created>=? GROUP BY owner HAVING SUM(v)>?)').bind(ws,mw.s).first()).r:null;
+    const row=(r,extra)=>({id:r.id,name:r.name,ava:avaOf(r),me:r.id===u.id,...extra});
+    const d=topCache.d;
     return{
-      value:topCache.d.val.map(r=>({name:r.name,s:r.s,n:r.n,me:r.id===u.id})),
-      plates:topCache.d.pl.map(r=>({name:r.name,me:r.uid===u.id,plate:{...JSON.parse(r.data),id:r.id}})),
+      value:d.val.map(r=>row(r,{s:r.s,n:r.n})),
+      plates:d.pl.map(r=>({id:r.uid,name:r.name,ava:avaOf({id:r.uid,av:r.av,photo:r.photo}),me:r.uid===u.id,plate:{...JSON.parse(r.data),id:r.id}})),
+      week:{list:d.wk.map(r=>row(r,{s:r.s,n:r.n})),me:{s:mw.s,n:mw.n,rank:rw},start:ws,end:we,prizes:PRIZES,
+        last:d.last.map(r=>row(r,{place:r.place,prize:r.prize,s:r.val}))},
       me:{s:mine.s,n:mine.n,rank}
     };
+  },
+  async 'GET /api/player'(env,u,url,now){
+    const id=int(url.searchParams.get('id'),1,1e15);
+    const r=await env.DB.prepare('SELECT id,name,dname,photo,av,spins,created,banned FROM users WHERE id=?').bind(id).first();
+    if(!r||(r.banned&&!isAdmin(env,u.id)))throw new HttpErr(404,'nouser');
+    const[agg,top,wins]=await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) n,COALESCE(SUM(v),0) s FROM plates WHERE owner=?').bind(id).first(),
+      env.DB.prepare('SELECT id,st,data,created FROM plates WHERE owner=? ORDER BY v DESC LIMIT 5').bind(id).all(),
+      env.DB.prepare('SELECT place,COUNT(*) n FROM weekly WHERE user=? GROUP BY place').bind(id).all()
+    ]);
+    const wn={1:0,2:0,3:0};wins.results.forEach(x=>{wn[x.place]=x.n});
+    return{id,name:dnOf(r),ava:avaOf(r),spins:r.spins,since:r.created,n:agg.n,total:agg.s,top:top.results.map(plateOf),wins:wn,me:id===u.id};
+  },
+  async 'POST /api/profile'(env,u,url,now,b){
+    const sets=[],args=[];
+    if(b.resetName)sets.push('dname=NULL');
+    else if(typeof b.name==='string'){
+      const nm=b.name.replace(/\s+/g,' ').trim();
+      if(nm!==dnOf(u)){
+        if(!/^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,19}$/u.test(nm)||/админ|admin|support|поддержк|layer|модератор/i.test(nm))throw new HttpErr(400,'badname');
+        if(now-u.name_at<NAME_CD)throw new HttpErr(429,'namewait',{wait:u.name_at+NAME_CD-now});
+        sets.push('dname=?','name_at=?');args.push(nm,now);
+      }
+    }
+    if(b.resetAvatar)sets.push('avatar=NULL','av=0');
+    else if(typeof b.avatar==='string'){
+      const m=/^data:image\/jpeg;base64,([A-Za-z0-9+\/=]+)$/.exec(b.avatar);
+      if(!m||m[1].length>70000||!m[1].startsWith('/9j/'))throw new HttpErr(400,'badava');
+      sets.push('avatar=?','av=?');args.push(m[1],now);
+    }
+    if(sets.length)await env.DB.prepare(`UPDATE users SET ${sets.join(',')} WHERE id=?`).bind(...args,u.id).run();
+    const u2=await env.DB.prepare('SELECT id,name,dname,photo,av,coins,spins FROM users WHERE id=?').bind(u.id).first();
+    return{user:userOut(u2,env)};
+  },
+  /* ---------- аукционы ---------- */
+  async 'GET /api/auctions'(env,u,url,now){
+    await settleAuctions(env,now);
+    const SQ=`SELECT a.*,p.data,${NAME_SQL('su')} sname,su.av sav,su.photo sphoto,${NAME_SQL('bu')} bname FROM auctions a JOIN plates p ON p.id=a.plate_id JOIN users su ON su.id=a.seller LEFT JOIN users bu ON bu.id=a.bidder`;
+    const act=(await env.DB.prepare(SQ+" WHERE a.st='active' AND a.ends>? ORDER BY a.ends ASC LIMIT 60").bind(now).all()).results;
+    const done=(await env.DB.prepare(SQ+" WHERE a.st IN('sold','unsold') AND (a.seller=? OR a.bidder=?) AND a.ends>? ORDER BY a.ends DESC LIMIT 10").bind(u.id,u.id,now-7*DAY).all()).results;
+    const row=r=>({id:r.id,st:r.st,start:r.start,bid:r.bidder?r.bid:0,bids:r.bids,min:aucMin(r),ends:r.ends,v:r.v,
+      seller:{id:r.seller,name:r.sname,ava:avaOf({id:r.seller,av:r.sav,photo:r.sphoto})},leader:r.bidder?{id:r.bidder,name:r.bname}:null,
+      mine:r.seller===u.id,leading:r.bidder===u.id,net:r.st==='sold'?Math.floor(r.bid*(100-COMM)/100):0,plate:{...JSON.parse(r.data),id:r.plate_id}});
+    return{list:act.map(row),done:done.map(row),now,max:MAX_AUC};
+  },
+  async 'POST /api/auction/create'(env,u,url,now,b){
+    const id=String(b.plateId||''),hours=int(b.hours,1,24);
+    if(!AU_HOURS[hours])throw new HttpErr(400,'bad');
+    const p=await env.DB.prepare("SELECT id,c,rar,v FROM plates WHERE id=? AND owner=? AND st='own'").bind(id,u.id).first();
+    if(!p)throw new HttpErr(409,'gone');
+    const start=int(b.start,Math.max(100,Math.ceil(p.v*SELL)),Math.ceil(p.v*3));
+    const cnt=(await env.DB.prepare("SELECT COUNT(*) n FROM auctions WHERE seller=? AND st='active'").bind(u.id).first()).n;
+    if(cnt>=MAX_AUC)throw new HttpErr(409,'limit');
+    const aid=uid(),ends=now+AU_HOURS[hours];
+    const res=await env.DB.batch([
+      env.DB.prepare("INSERT INTO auctions(id,plate_id,seller,start,created,ends,c,rar,v) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM plates WHERE id=? AND owner=? AND st='own')").bind(aid,id,u.id,start,now,ends,p.c,p.rar,p.v,id,u.id),
+      env.DB.prepare("UPDATE plates SET st='listed' WHERE id=? AND owner=? AND st='own' AND (SELECT changes())=1").bind(id,u.id)
+    ]);
+    if(res[0].meta.changes!==1)throw new HttpErr(409,'gone');
+    return{id:aid,ends};
+  },
+  async 'POST /api/auction/bid'(env,u,url,now,b){
+    const id=String(b.id||''),amt=int(b.amount,1,1e9);
+    const a=await env.DB.prepare('SELECT id,seller,start,bid,bidder,bids,ends,st,plate_id FROM auctions WHERE id=?').bind(id).first();
+    if(!a||a.st!=='active'||a.ends<=now)throw new HttpErr(410,'gone');
+    if(a.seller===u.id)throw new HttpErr(400,'own');
+    if(a.bidder===u.id)throw new HttpErr(409,'lead');
+    const min=aucMin(a);
+    if(amt<min)throw new HttpErr(409,'low',{min});
+    if(u.coins<amt)throw new HttpErr(402,'coins');
+    const ends=Math.max(a.ends,now+AU_SNIPE);
+    const st=[
+      env.DB.prepare("UPDATE auctions SET bid=?,bidder=?,bids=bids+1,ends=? WHERE id=? AND st='active' AND ends>? AND seller!=? AND bids=? AND COALESCE(bidder,0)=? AND (SELECT coins FROM users WHERE id=?)>=?").bind(amt,u.id,ends,id,now,u.id,a.bids,a.bidder||0,u.id,amt),
+      env.DB.prepare('UPDATE users SET coins=coins-? WHERE id=? AND (SELECT changes())=1').bind(amt,u.id)
+    ];
+    if(a.bidder)st.push(env.DB.prepare('UPDATE users SET coins=coins+? WHERE id=? AND (SELECT changes())=1').bind(a.bid,a.bidder));
+    const res=await env.DB.batch(st);
+    if(res[0].meta.changes!==1){
+      const c=await env.DB.prepare('SELECT bid,bidder,start,st,ends FROM auctions WHERE id=?').bind(id).first();
+      if(!c||c.st!=='active'||c.ends<=now)throw new HttpErr(410,'gone');
+      if(c.bidder===u.id)throw new HttpErr(409,'lead');
+      throw new HttpErr(409,'low',{min:aucMin(c)});
+    }
+    if(a.bidder)bg((async()=>notify(env,a.bidder,`📈 Вашу ставку на номер <b>${esc(await plateNm(env,a.plate_id))}</b> перебили: теперь ${fmtN(amt)}. Ваши ${fmtN(a.bid)} вернулись на счёт.`))());
+    return{coins:u.coins-amt,bid:amt,ends,min:aucMin({bidder:u.id,bid:amt,start:a.start})};
+  },
+  async 'POST /api/auction/cancel'(env,u,url,now,b){
+    const id=String(b.id||'');
+    const res=await env.DB.batch([
+      env.DB.prepare("UPDATE auctions SET st='cancelled' WHERE id=? AND seller=? AND st='active' AND bids=0 AND ends>?").bind(id,u.id,now),
+      env.DB.prepare("UPDATE plates SET st='own' WHERE id=(SELECT plate_id FROM auctions WHERE id=?) AND (SELECT changes())=1").bind(id)
+    ]);
+    if(res[0].meta.changes!==1)throw new HttpErr(409,'gone');
+    return{ok:true};
   },
   async 'GET /api/ach'(env,u,url,now){
     const m=await achSync(env,u,now)||await achMetrics(env,u);
@@ -595,6 +788,7 @@ const routes={
   },
   async 'GET /api/me'(env,u,url,now){
     await housekeeping(env,now);
+    u.coins=await coinsOf(env,u.id);
     const sq=url.searchParams.get('since'),since=sq===null?now:+sq||0;
     const[inv,lots,sales]=await Promise.all([
       env.DB.prepare('SELECT id,st,data,created FROM plates WHERE owner=? ORDER BY rar DESC,v DESC LIMIT 1000').bind(u.id).all(),
@@ -677,13 +871,13 @@ const routes={
   async 'GET /api/market'(env,u,url,now){
     await housekeeping(env,now);
     const c=url.searchParams.get('c')||'ALL';
-    const rows=(await env.DB.prepare("SELECT l.id,l.price,l.seller,l.seller_name,l.expires,l.v,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.st='active' AND l.seller!=? AND (?='ALL' OR l.c=?) AND l.expires>? ORDER BY l.rar DESC,l.price*1.0/l.v ASC LIMIT 60").bind(u.id,c,c,now).all()).results;
-    return{lots:rows.map(r=>({id:r.id,price:r.price,seller:r.seller_name,expires:r.expires,plate:{...JSON.parse(r.data),id:r.pid}})),now};
+    const rows=(await env.DB.prepare("SELECT l.id,l.price,l.seller,(SELECT COALESCE(NULLIF(dname,''),name) FROM users WHERE id=l.seller) seller_name,(SELECT av FROM users WHERE id=l.seller) sav,(SELECT photo FROM users WHERE id=l.seller) sphoto,l.expires,l.v,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.st='active' AND l.seller!=? AND (?='ALL' OR l.c=?) AND l.expires>? ORDER BY l.rar DESC,l.price*1.0/l.v ASC LIMIT 60").bind(u.id,c,c,now).all()).results;
+    return{lots:rows.map(r=>({id:r.id,price:r.price,seller:r.seller_name,sellerId:r.seller,sellerAva:avaOf({id:r.seller,av:r.sav,photo:r.sphoto}),expires:r.expires,plate:{...JSON.parse(r.data),id:r.pid}})),now};
   },
   async 'GET /api/lots'(env,u,url,now){
     await housekeeping(env,now);
     const act=(await env.DB.prepare("SELECT l.id,l.price,l.expires,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.seller=? AND l.st='active' ORDER BY l.created DESC").bind(u.id).all()).results;
-    const sold=(await env.DB.prepare("SELECT l.id,l.price,l.sold_at,l.buyer_name,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.seller=? AND l.st='sold' ORDER BY l.sold_at DESC LIMIT 10").bind(u.id).all()).results;
+    const sold=(await env.DB.prepare("SELECT l.id,l.price,l.sold_at,(SELECT COALESCE(NULLIF(dname,''),name) FROM users WHERE id=l.buyer) buyer_name,p.id pid,p.data FROM lots l JOIN plates p ON p.id=l.plate_id WHERE l.seller=? AND l.st='sold' ORDER BY l.sold_at DESC LIMIT 10").bind(u.id).all()).results;
     return{active:act.map(r=>({id:r.id,price:r.price,net:Math.floor(r.price*(100-COMM)/100),expires:r.expires,plate:{...JSON.parse(r.data),id:r.pid}})),
       sold:sold.map(r=>({id:r.id,price:r.price,net:Math.floor(r.price*(100-COMM)/100),at:r.sold_at,buyer:r.buyer_name,plate:{...JSON.parse(r.data),id:r.pid}})),now};
   },
@@ -696,7 +890,7 @@ const routes={
     if(cnt>=MAX_LOTS)throw new HttpErr(409,'limit');
     const lid=uid();
     const res=await env.DB.batch([
-      env.DB.prepare("INSERT INTO lots(id,plate_id,seller,seller_name,price,created,expires,c,rar,v) SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM plates WHERE id=? AND owner=? AND st='own')").bind(lid,id,u.id,u.name,price,now,now+LOT_TTL,p.c,p.rar,p.v,id,u.id),
+      env.DB.prepare("INSERT INTO lots(id,plate_id,seller,seller_name,price,created,expires,c,rar,v) SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM plates WHERE id=? AND owner=? AND st='own')").bind(lid,id,u.id,dnOf(u),price,now,now+LOT_TTL,p.c,p.rar,p.v,id,u.id),
       env.DB.prepare("UPDATE plates SET st='listed' WHERE id=? AND owner=? AND st='own'").bind(id,u.id)
     ]);
     if(res[0].meta.changes!==1)throw new HttpErr(409,'gone');
@@ -710,7 +904,7 @@ const routes={
     if(u.coins<lot.price)throw new HttpErr(402,'coins');
     const ok="EXISTS(SELECT 1 FROM lots WHERE id=? AND st='sold' AND buyer=? AND settled=0)";
     const res=await env.DB.batch([
-      env.DB.prepare("UPDATE lots SET st='sold',buyer=?,buyer_name=?,sold_at=?,settled=0 WHERE id=? AND st='active' AND seller!=? AND expires>? AND (SELECT coins FROM users WHERE id=?)>=price").bind(u.id,u.name,now,id,u.id,now,u.id),
+      env.DB.prepare("UPDATE lots SET st='sold',buyer=?,buyer_name=?,sold_at=?,settled=0 WHERE id=? AND st='active' AND seller!=? AND expires>? AND (SELECT coins FROM users WHERE id=?)>=price").bind(u.id,dnOf(u),now,id,u.id,now,u.id),
       env.DB.prepare(`UPDATE users SET coins=coins-(SELECT price FROM lots WHERE id=?) WHERE id=? AND ${ok}`).bind(id,u.id,id,u.id),
       env.DB.prepare(`UPDATE users SET coins=coins+(SELECT price*${100-COMM}/100 FROM lots WHERE id=?) WHERE id=(SELECT seller FROM lots WHERE id=?) AND ${ok}`).bind(id,id,id,u.id),
       env.DB.prepare(`UPDATE plates SET owner=?,st='own' WHERE id=(SELECT plate_id FROM lots WHERE id=?) AND ${ok}`).bind(u.id,id,id,u.id),
@@ -806,7 +1000,7 @@ async function ensureWebhook(env,origin){
 }
 
 export default{
-  async scheduled(ev,env,ctx){curCtx=ctx;remAt=0;await init(env);await maybeReminders(env)},
+  async scheduled(ev,env,ctx){curCtx=ctx;remAt=0;await init(env);await settleAuctions(env,Date.now());await maybeReminders(env)},
   async fetch(req,env,ctx){
     const h=cors(req,env);
     if(req.method==='OPTIONS')return new Response(null,{status:204,headers:h});
@@ -817,6 +1011,7 @@ export default{
       if(ctx&&ctx.waitUntil){ctx.waitUntil(ensureWebhook(env,url.origin));ctx.waitUntil(maybeReminders(env).catch(e=>console.log('rem',e&&e.message)))}
       if(key==='POST /tg/hook'){await init(env);return await onHook(req,env)}
       if(key==='GET /api/ping')return out({ok:true});
+      if(req.method==='GET'&&url.pathname.startsWith('/api/ava/')){await init(env);return await ava(env,url)}
       const fn=routes[key];if(!fn)return out({error:'notfound'},404);
       await init(env);
       const a=await auth(req,env),now=Date.now();
