@@ -616,6 +616,52 @@ main{display:flex;flex-direction:column}
 .wkc .pz{display:flex;gap:8px;margin-top:10px}
 .wkc .pz div{flex:1;text-align:center;padding:9px 4px;border-radius:14px;background:rgba(255,255,255,.05);font:500 12.5px Unbounded,sans-serif;display:flex;flex-direction:column;gap:3px}
 .wkc .pz small{font:500 11px Onest,sans-serif;color:var(--mut)}
+/* оформление профиля: фон, эффект ника, титул, значки, статус, витрина */
+.pl-top{padding:14px 14px 12px;border-radius:20px;background:var(--card);border:1px solid var(--line);position:relative;overflow:hidden}
+.pl-top .pl-h{margin-top:0;position:relative}
+.pl-tt{display:inline-block;margin-top:3px;padding:2px 9px;border-radius:10px;background:rgba(255,255,255,.1);font:700 11.5px Onest,sans-serif;letter-spacing:.02em}
+.pl-bd{display:flex;gap:6px;margin-top:10px;position:relative}
+.pl-bd span{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);font-size:18px}
+.pl-ss{display:inline-block;margin-top:10px;padding:6px 12px;border-radius:14px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);font:600 13px Onest,sans-serif;position:relative}
+.pl-top .pl-h small{display:block;margin-top:5px}
+.pl-top[class*=k-bg_] .pl-h small{color:rgba(255,255,255,.82);text-shadow:0 1px 3px rgba(0,0,0,.55)}
+.pl-top[class*=k-bg_] .pl-h b:not([class*=k-fx_]){text-shadow:0 1px 4px rgba(0,0,0,.55)}
+.pl-st.g8{grid-template-columns:1fr 1fr}
+.pl-st b .u{font:500 11px Onest,sans-serif;color:var(--mut)}
+.pk .meta .fnd{display:block;color:var(--mut);font-size:11.5px;margin-top:2px}
+.k-bg_aurora{background:linear-gradient(135deg,#0b2a45 0%,#14706c 50%,#5b3aa8 100%)}
+.k-bg_sunset{background:linear-gradient(135deg,#3b1d5e 0%,#c2410c 60%,#f59e0b 100%)}
+.k-bg_carbon{background:repeating-linear-gradient(45deg,#14161c 0 6px,#1b1e26 6px 12px)}
+.k-bg_neon{background:linear-gradient(135deg,#1a0b3b 0%,#3b0a6e 50%,#0b6e8a 100%);box-shadow:inset 0 0 0 1px rgba(125,249,255,.5),0 0 18px rgba(34,211,238,.25)}
+.k-bg_gold{background:linear-gradient(135deg,#4a3410 0%,#a6791c 50%,#e8c25a 100%)}
+.k-bg_ice{background:linear-gradient(135deg,#0d2238 0%,#2a6f9a 55%,#bfe6f7 100%)}
+.pl-top[class*=k-bg_]{border-color:rgba(255,255,255,.18)}
+.k-fx_gold{background:linear-gradient(90deg,#f59e0b,#fff3b0,#f59e0b);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:fxs 3s linear infinite}
+.k-fx_neon{color:#8df6ff!important;text-shadow:0 0 6px #22d3ee,0 0 16px #22d3ee}
+.k-fx_fire{background:linear-gradient(0deg,#dc2626,#f59e0b 55%,#fde68a);-webkit-background-clip:text;background-clip:text;color:transparent!important;filter:drop-shadow(0 0 6px rgba(249,115,22,.55))}
+.k-fx_rainbow{background:linear-gradient(90deg,#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f87171);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:fxs 4s linear infinite}
+@keyframes fxs{to{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){.k-fx_gold,.k-fx_rainbow{animation:none}}
+#lk .lk-pv{margin:2px 0 4px}
+#lk .lk-sec{margin:14px 0 6px;text-align:left;font:700 13px Onest,sans-serif;color:var(--mut);letter-spacing:.02em}
+#lk .lk-note{text-align:left;color:var(--mut);font-size:12.5px;line-height:1.45;margin:8px 0 0}
+.lk-g{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.lk-pl{position:relative;padding:10px 6px;border-radius:14px;background:var(--card);border:1.5px solid var(--line);display:grid;place-items:center;min-height:54px}
+.lk-pl.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}
+.lk-pl i.n{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:11px;background:var(--ac);color:#0a0c12;font:800 12px Onest,sans-serif;display:grid;place-items:center;font-style:normal}
+.lk-r{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;margin-top:6px;border-radius:14px;background:var(--card);border:1.5px solid var(--line);color:var(--tx);text-align:left;font:600 14px Onest,sans-serif}
+.lk-r.on{border-color:var(--ac)}
+.lk-r .e{font-size:19px;width:26px;text-align:center}
+.lk-r .w{flex:1;min-width:0}
+.lk-r small{display:block;color:var(--mut);font:500 11.5px Onest,sans-serif;margin-top:1px}
+.lk-r .pr{flex:none;padding:5px 10px;border-radius:12px;background:rgba(251,191,36,.14);color:#fbbf24;font:700 12.5px Onest,sans-serif}
+.lk-r .ck{flex:none;color:var(--ac);font-weight:800}
+.lk-sw{height:64px;border-radius:14px;border:1.5px solid var(--line);position:relative;display:flex;align-items:flex-end;justify-content:space-between;padding:7px 9px;color:#fff;font:700 12px Onest,sans-serif;text-shadow:0 1px 3px rgba(0,0,0,.6);background-color:var(--card);text-align:left}
+.lk-sw.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}
+.lk-sw .pr{padding:3px 8px;border-radius:10px;background:rgba(0,0,0,.45);color:#fbbf24;text-shadow:none}
+.lk-bd{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.lk-bd button{width:46px;height:46px;border-radius:14px;background:var(--card);border:1.5px solid var(--line);font-size:22px}
+.lk-bd button.on{border-color:var(--ac);background:rgba(255,255,255,.06)}
 .pl-h{display:flex;align-items:center;gap:14px;text-align:left;margin-top:4px}
 .pl-h .av{width:68px;height:68px;font-size:26px}
 .pl-h b{display:block;font:700 19px Onest,sans-serif;overflow:hidden;text-overflow:ellipsis}
@@ -881,6 +927,7 @@ main{display:flex;flex-direction:column}
       </div>
       <h3>Последние выпавшие</h3>
       <div id="recent"></div>
+      <button class="btn pbtn" id="p-look"><span>Витрина и оформление</span><span style="color:var(--ac);font-size:13px">Фон, титул, ник</span></button>
       <button class="btn pbtn" id="p-daily"><span>Ежедневные награды</span><span id="p-daily-l" style="color:var(--mut);font-size:13px"></span></button>
       <button class="btn pbtn" id="p-ach"><span>Достижения<i class="dot" id="p-ach-d" hidden></i></span><span id="p-ach-l" style="color:var(--mut);font-size:13px">Награды</span></button>
       <button class="btn pbtn" id="p-top"><span>Рейтинг игроков</span><span style="color:var(--mut);font-size:13px">Топ</span></button>
@@ -972,6 +1019,7 @@ main{display:flex;flex-direction:column}
 <div class="ov sheet" id="ov-tr"><div class="sh" id="tr"></div></div>
 <div class="ov sheet" id="ov-pe"><div class="sh" id="pe"></div></div>
 <div class="ov sheet" id="ov-pl"><div class="sh" id="pl" style="max-height:88vh;overflow-y:auto"></div></div>
+<div class="ov sheet" id="ov-lk"><div class="sh" id="lk" style="max-height:92vh;overflow-y:auto"></div></div>
 <div class="ov sheet" id="ov-bn"><div class="sh" id="bn"></div></div>
 <div class="ov sheet" id="ov-ac"><div class="sh" id="ac" style="max-height:92vh;overflow-y:auto"></div></div>
 <div class="ov sheet" id="ov-aq"><div class="sh" id="aq" style="max-height:88vh;overflow-y:auto"></div></div>
@@ -2243,6 +2291,14 @@ $('#p-me').onclick=()=>{hapI();openProfileEdit()};
 $('#ov-pe').onclick=e=>{if(e.target.id==='ov-pe')hide('#ov-pe')};
 
 /* ---------- профиль другого игрока ---------- */
+const kc=k=>k?' k-'+k:'';
+function plHead(r,since){
+  return `<div class="pl-top${kc(r.bg)}">
+    <div class="pl-h">${avH(r)}<div style="min-width:0"><b class="${(r.fx?'k-'+r.fx:'').trim()}">${esc(r.name)||'Игрок'}${r.me?' · вы':''}</b>${r.title?`<span class="pl-tt">${esc(r.title.n)}</span>`:''}${since?`<small>В игре с ${since}</small>`:''}</div></div>
+    ${r.badges&&r.badges.length?`<div class="pl-bd">${r.badges.map(x=>`<span title="${esc(x.t)}">${x.e}</span>`).join('')}</div>`:''}
+    ${r.status?`<div class="pl-ss">${r.status.e} ${esc(r.status.t)}</div>`:''}</div>`;
+}
+const pfRow=(p,note)=>`<div class="pk r${p.rar}">${plateHTML(p,'11px')}<span class="meta"><span class="rl" style="display:block">${RAR[p.rar].n}</span><span class="val"><i class="coin"></i>${fmt(p.v)}</span>${note?`<span class="fnd">${note}</span>`:''}</span></div>`;
 async function openPlayer(id){
   id=+id;if(!id)return;
   $('#pl').innerHTML='<div class="grab"></div><div class="empty" style="padding:34px"><div class="spinner" style="margin:0 auto"></div></div>';
@@ -2251,20 +2307,162 @@ async function openPlayer(id){
     const r=await api('GET','/api/player?id='+id);
     if(!$('#ov-pl').classList.contains('on'))return;
     const since=new Date(r.since).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
-    const w=r.wins||{},medals=[['🥇',w[1]],['🥈',w[2]],['🥉',w[3]]].filter(x=>x[1]>0);
-    $('#pl').innerHTML=`<div class="grab"></div>
-      <div class="pl-h">${avH(r)}<div style="min-width:0"><b>${esc(r.name)||'Игрок'}${r.me?' · вы':''}</b><small>В игре с ${since}</small></div></div>
-      <div class="pl-st"><div><small>Номеров</small><b>${fmt(r.n)}</b></div><div><small>Оценка гаража</small><b><i class="coin"></i>${fmt(r.total)}</b></div><div><small>Круток</small><b>${fmt(r.spins)}</b></div><div><small>Лучший номер</small><b><i class="coin"></i>${fmt(r.top[0]?r.top[0].v:0)}</b></div></div>
+    const w=r.wins||{},medals=[['🥇',w[1]],['🥈',w[2]],['🥉',w[3]]].filter(x=>x[1]>0),st=r.stats||{};
+    const tile=(t,v,coin)=>`<div><small>${t}</small><b>${coin?'<i class="coin"></i>':''}${v}</b></div>`;
+    const same=st.best&&st.rare&&JSON.stringify(st.best)===JSON.stringify(st.rare);
+    const recs=(st.best||st.rare)?`<div class="sec" style="margin-top:16px;text-align:left">Рекорды</div>
+      ${st.best?pfRow(st.best,same?'Лучшая находка и самая редкая':'Лучшая находка'):''}${st.rare&&!same?pfRow(st.rare,'Самая редкая находка'):''}`:'';
+    const useShow=r.show&&r.show.length;
+    $('#pl').innerHTML=`<div class="grab"></div>${plHead(r,since)}
+      <div class="pl-st g8">${tile('Номеров',fmt(r.n))}${tile('Оценка гаража',fmt(r.total),1)}${tile('Круток',fmt(r.spins))}${tile('Достижения',(st.ach|0)+' из '+(st.achTotal|0))}
+      ${tile('Серия наград',(st.streak|0)+' '+plural(st.streak|0,'день','дня','дней'))}${tile('Продаж на рынке',fmt(st.sold|0))}${tile('Оборот продаж',fmt(st.soldSum|0),1)}${tile('Побед в аукционах',fmt(st.aucWins|0))}</div>
       ${medals.length?`<div class="pl-w">${medals.map(m=>`<span>${m[0]} ×${m[1]}</span>`).join('')}</div>`:''}
-      <div class="sec" style="margin-top:16px;text-align:left">Лучшие номера</div>
-      ${r.top.map(p=>`<div class="pk r${p.rar}">${plateHTML(p,'11px')}<span class="meta"><span class="rl" style="display:block">${RAR[p.rar].n}</span><span class="val"><i class="coin"></i>${fmt(p.v)}</span></span></div>`).join('')||'<div class="empty" style="padding:18px">Гараж пока пуст</div>'}
-      ${r.me?'<button class="btn gold wide" id="pl-ed" style="margin-top:14px">Изменить профиль</button>':''}
+      ${recs}
+      <div class="sec" style="margin-top:16px;text-align:left">${useShow?'Витрина':'Лучшие номера'}</div>
+      ${(useShow?r.show:r.top).map(p=>pfRow(p)).join('')||'<div class="empty" style="padding:14px">Пока нет номеров.</div>'}
+      ${r.me?'<button class="btn gold wide" id="pl-lk" style="margin-top:14px">Витрина и оформление</button><button class="btn wide" id="pl-ed" style="margin-top:8px">Изменить имя и фото</button>':''}
       <button class="btn wide" id="pl-x" style="margin-top:8px">Закрыть</button>`;
     $('#pl-x').onclick=()=>hide('#ov-pl');
     const ed=$('#pl-ed');if(ed)ed.onclick=()=>{hide('#ov-pl');openProfileEdit()};
+    const lkb=$('#pl-lk');if(lkb)lkb.onclick=()=>{hide('#ov-pl');openLook()};
   }catch(e){hide('#ov-pl');errToast(e)}
 }
 $('#ov-pl').onclick=e=>{if(e.target.id==='ov-pl')hide('#ov-pl')};
+
+/* ---------- витрина и оформление профиля ---------- */
+const LK={d:null,sel:null,tab:'sh',busy:false};
+const lkSnap=x=>JSON.stringify([x.sh,x.tt,x.bd,x.bg,x.fx,x.stt]);
+async function openLook(tab){
+  if(tab)LK.tab=tab;
+  $('#lk').innerHTML='<div class="grab"></div><div class="empty" style="padding:34px"><div class="spinner" style="margin:0 auto"></div></div>';
+  show('#ov-lk');
+  try{
+    const d=await api('GET','/api/profile/look');
+    if(!$('#ov-lk').classList.contains('on'))return;
+    LK.d=d;LK.sel={...d.cur,sh:[...d.cur.sh],bd:[...d.cur.bd]};LK.busy=false;paintLook();
+  }catch(e){hide('#ov-lk');errToast(e)}
+}
+function lkTitleName(k){
+  if(!k)return'';const d=LK.d;
+  if(k.startsWith('a:'))return(d.ach.find(a=>a.k===k.slice(2))||{}).t||'';
+  return(d.cos.find(c=>c.k===k)||{}).n||'';
+}
+function paintLook(){
+  const d=LK.d,sel=LK.sel,nm=S.name||(user&&user.first_name)||'Игрок';
+  const tn=lkTitleName(sel.tt),stt=d.sts.find(x=>x.k===sel.stt);
+  const prev={name:nm,ava:S.ava!=null?S.ava:(user&&user.photo_url),title:tn?{n:tn}:null,fx:sel.fx,bg:sel.bg,status:stt?{e:stt.e,t:stt.t}:null,
+    badges:sel.bd.map(k=>d.ach.find(a=>a.k===k)).filter(Boolean)};
+  const dirty=lkSnap(sel)!==lkSnap(d.cur);
+  const TABS=[['sh','Витрина'],['tt','Титул'],['bg','Фон'],['fx','Ник'],['stt','Статус']];
+  const price=c=>c.own?'':`<span class="pr">⭐ ${c.stars}</span>`;
+  let body='';
+  if(LK.tab==='sh'){
+    const inv=[...S.inv].sort((a,b)=>b.v-a.v).slice(0,80);
+    body=`<p class="lk-note">Выберите до ${d.max.sh} номеров: их увидят все в вашем профиле, в выбранном порядке. Цифра на номере — его место.</p>
+      ${inv.length?`<div class="lk-g">${inv.map(p=>{const i=sel.sh.indexOf(p.id);return`<button class="lk-pl${i>=0?' on':''}" data-id="${p.id}">${plateHTML(p,'9px')}${i>=0?`<i class="n">${i+1}</i>`:''}</button>`}).join('')}</div>`:'<div class="empty" style="padding:18px">В гараже пока нет номеров.</div>'}`;
+  }else if(LK.tab==='tt'){
+    const paid=d.cos.filter(c=>c.t==='tt');
+    body=`<div class="lk-sec">Титул под ником</div>
+      <button class="lk-r${!sel.tt?' on':''}" data-tt=""><span class="e">∅</span><span class="w">Без титула</span>${!sel.tt?'<span class="ck">✓</span>':''}</button>
+      ${d.ach.map(a=>`<button class="lk-r${sel.tt==='a:'+a.k?' on':''}" data-tt="a:${a.k}"><span class="e">${a.e}</span><span class="w">${esc(a.t)}<small>За достижение</small></span>${sel.tt==='a:'+a.k?'<span class="ck">✓</span>':''}</button>`).join('')}
+      ${paid.map(c=>`<button class="lk-r${sel.tt===c.k?' on':''}" data-tt="${c.k}" data-buy="${c.own?'':c.k}"><span class="e">🏷</span><span class="w">${esc(c.n)}<small>${c.own?'Куплено':'Эксклюзивный титул'}</small></span>${c.own?(sel.tt===c.k?'<span class="ck">✓</span>':''):price(c)}</button>`).join('')}
+      <div class="lk-sec">Значки (до ${d.max.bd})</div>
+      ${d.ach.length?`<div class="lk-bd">${d.ach.map(a=>`<button class="${sel.bd.includes(a.k)?'on':''}" data-bd="${a.k}" title="${esc(a.t)}" aria-label="${esc(a.t)}">${a.e}</button>`).join('')}</div>
+      <p class="lk-note">Значки открываются достижениями. Они видны рядом с профилем.</p>`:'<p class="lk-note">Значков пока нет: выполняйте достижения в профиле.</p>'}`;
+  }else if(LK.tab==='bg'){
+    const L=d.cos.filter(c=>c.t==='bg');
+    body=`<p class="lk-note">Фон карточки вашего профиля. Покупка навсегда.</p><div class="lk-g">
+      <button class="lk-sw${!sel.bg?' on':''}" data-bg=""><span>Без фона</span></button>
+      ${L.map(c=>`<button class="lk-sw k-${c.k}${sel.bg===c.k?' on':''}" data-bg="${c.k}" data-buy="${c.own?'':c.k}"><span>${esc(c.n)}</span>${price(c)}</button>`).join('')}</div>`;
+  }else if(LK.tab==='fx'){
+    const L=d.cos.filter(c=>c.t==='fx');
+    body=`<p class="lk-note">Эффект для вашего ника в профиле. Покупка навсегда.</p>
+      <button class="lk-r${!sel.fx?' on':''}" data-fx=""><span class="w">Обычный ник</span>${!sel.fx?'<span class="ck">✓</span>':''}</button>
+      ${L.map(c=>`<button class="lk-r${sel.fx===c.k?' on':''}" data-fx="${c.k}" data-buy="${c.own?'':c.k}"><span class="w"><b class="k-${c.k}" style="font:700 16px Onest,sans-serif">${esc(nm)}</b><small>${esc(c.n)}${c.own?' · куплено':''}</small></span>${c.own?(sel.fx===c.k?'<span class="ck">✓</span>':''):price(c)}</button>`).join('')}`;
+  }else{
+    body=`<p class="lk-note">Короткий статус под ником. Выберите из списка.</p>
+      <button class="lk-r${!sel.stt?' on':''}" data-stt=""><span class="e">∅</span><span class="w">Без статуса</span>${!sel.stt?'<span class="ck">✓</span>':''}</button>
+      ${d.sts.map(x=>`<button class="lk-r${sel.stt===x.k?' on':''}" data-stt="${x.k}"><span class="e">${x.e}</span><span class="w">${esc(x.t)}</span>${sel.stt===x.k?'<span class="ck">✓</span>':''}</button>`).join('')}`;
+  }
+  const sc=$('#lk').scrollTop;
+  $('#lk').innerHTML=`<div class="grab"></div><h4>Витрина и оформление</h4>
+    <div class="lk-pv">${plHead(prev,'')}</div>
+    ${pills(TABS,LK.tab,'lk')}
+    <div id="lk-b">${body}</div>
+    <button class="btn gold wide" id="lk-save" style="margin-top:16px"${dirty&&!LK.busy?'':' disabled'}>${LK.busy?'Сохраняю…':'Сохранить'}</button>
+    <button class="btn wide" id="lk-x" style="margin-top:8px">Закрыть</button>`;
+  $('#lk').scrollTop=sc;
+  $('#lk-x').onclick=()=>hide('#ov-lk');
+  $('#lk-save').onclick=lkSave;
+  $('#lk').querySelectorAll('.apills button').forEach(b=>b.onclick=()=>{hapS();LK.tab=b.dataset.v;paintLook();$('#lk').scrollTop=0});
+  const buyOr=(el,fn)=>{const k=el.dataset.buy;if(k){lkBuy(k);return}fn()};
+  $('#lk').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.id,i=sel.sh.indexOf(id);
+    if(i>=0)sel.sh.splice(i,1);
+    else if(sel.sh.length>=d.max.sh){toast('Не больше '+d.max.sh+' номеров');hapN('error');return}
+    else sel.sh.push(id);
+    hapS();paintLook();
+  });
+  $('#lk').querySelectorAll('[data-tt]').forEach(b=>b.onclick=()=>buyOr(b,()=>{sel.tt=b.dataset.tt;hapS();paintLook()}));
+  $('#lk').querySelectorAll('[data-bg]').forEach(b=>b.onclick=()=>buyOr(b,()=>{sel.bg=b.dataset.bg;hapS();paintLook()}));
+  $('#lk').querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>buyOr(b,()=>{sel.fx=b.dataset.fx;hapS();paintLook()}));
+  $('#lk').querySelectorAll('[data-stt]').forEach(b=>b.onclick=()=>{sel.stt=b.dataset.stt;hapS();paintLook()});
+  $('#lk').querySelectorAll('[data-bd]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.bd,i=sel.bd.indexOf(k);
+    if(i>=0)sel.bd.splice(i,1);
+    else if(sel.bd.length>=d.max.bd){toast('Не больше '+d.max.bd+' значков');hapN('error');return}
+    else sel.bd.push(k);
+    hapS();paintLook();
+  });
+}
+async function lkSave(){
+  if(LK.busy)return;LK.busy=true;paintLook();
+  const s=LK.sel;
+  try{
+    const r=await api('POST','/api/profile/look',{sh:s.sh,tt:s.tt,bd:s.bd,bg:s.bg,fx:s.fx,stt:s.stt});
+    LK.d.cur={...r.cur,sh:[...r.cur.sh],bd:[...r.cur.bd]};LK.sel={...LK.d.cur,sh:[...LK.d.cur.sh],bd:[...LK.d.cur.bd]};
+    LK.busy=false;paintLook();toast('Профиль сохранён');hapN('success');
+  }catch(e){
+    LK.busy=false;
+    if(e&&e.error==='gone'){toast('Один из номеров уже не в гараже');await refreshMe();LK.sel.sh=LK.sel.sh.filter(id=>S.inv.some(p=>p.id===id))}
+    else errToast(e);
+    paintLook();
+  }
+}
+async function lkBuy(k){
+  if(LK.busy)return;
+  const c=LK.d.cos.find(x=>x.k===k);if(!c||c.own)return;
+  LK.busy=true;hapS();paintLook();
+  let inv;
+  try{inv=await api('POST','/api/shop/invoice',{item:k})}
+  catch(e){LK.busy=false;errToast(e);if(e&&e.error==='have'){await lkReload()}paintLook();return}
+  const done=async status=>{
+    if(status!=='paid'&&status!=='pending'){LK.busy=false;toast(status==='cancelled'?'Оплата отменена':'Оплата не прошла');hapN('error');paintLook();return}
+    let q={};
+    for(let i=0;i<20;i++){
+      try{q=await api('GET','/api/custom/order?id='+inv.order)}catch(e){}
+      if(q.st==='paid'||q.st==='refunded')break;
+      await sleep(1000);
+    }
+    LK.busy=false;
+    if(q.st==='paid'){
+      await lkReload();
+      const t=LK.d.cos.find(x=>x.k===k);
+      if(t&&t.own){const f=t.t;LK.sel[f]=k}
+      paintLook();toast('Куплено: «'+c.n+'». Нажмите «Сохранить»');hapN('success');burst(3);return;
+    }
+    if(q.st==='refunded'){toast('Не удалось выдать товар, звёзды вернутся');paintLook();return}
+    toast('Оплата ещё обрабатывается. Оформление появится, мы напишем в боте');paintLook();
+  };
+  try{
+    if(tg&&tg.openInvoice)tg.openInvoice(inv.url,done);
+    else{window.open(inv.url,'_blank');LK.busy=false;toast('Откройте счёт в Telegram и оплатите');paintLook()}
+  }catch(e){LK.busy=false;toast('Не удалось открыть оплату');paintLook()}
+}
+async function lkReload(){
+  try{const d=await api('GET','/api/profile/look');const keep=LK.sel;LK.d=d;LK.sel={...keep};}catch(e){}
+}
+$('#ov-lk').onclick=e=>{if(e.target.id==='ov-lk')hide('#ov-lk')};
 
 /* ---------- аукционы ---------- */
 let AUC={list:[],done:[],skew:0,max:3},aucIds=null,aLoad=0,aLast=0;
@@ -2849,7 +3047,7 @@ function partnerCard(p){
     <div class="t2" style="word-break:break-all"><span>${esc(p.link)}</span></div>
     <div class="t3"><button data-act="cl">Ссылка</button><button data-act="pp">Выплатил</button><button data-act="pe">Изменить</button></div></div>`;
 }
-const ADPL={p1:'Пакет 10 000 монет',p2:'Пакет 33 000 монет',p3:'Пакет 120 000 монет',p4:'Пакет 400 000 монет',sr1:'Звёздная рулетка ×1',sr5:'Звёздная рулетка ×5',cs:'Мифический кейс',bx:'Ускоритель ×2 на 7 дней',bl:'+5 слотов лотов',ba:'+2 слота аукционов'};
+const ADPL={p1:'Пакет 10 000 монет',p2:'Пакет 33 000 монет',p3:'Пакет 120 000 монет',p4:'Пакет 400 000 монет',sr1:'Звёздная рулетка ×1',sr5:'Звёздная рулетка ×5',cs:'Мифический кейс',bx:'Ускоритель ×2 на 7 дней',bl:'+5 слотов лотов',ba:'+2 слота аукционов',tt_king:'Титул «Король номеров»',tt_major:'Титул «Мажор»',tt_hunter:'Титул «Охотник за мификами»',tt_boss:'Титул «Босс гаража»',bg_aurora:'Фон «Северное сияние»',bg_sunset:'Фон «Закат»',bg_carbon:'Фон «Карбон»',bg_neon:'Фон «Неон»',bg_gold:'Фон «Золото»',bg_ice:'Фон «Лёд»',fx_gold:'Ник «Золотой»',fx_neon:'Ник «Неоновый»',fx_fire:'Ник «Огненный»',fx_rainbow:'Ник «Радужный»'};
 function pricesBlock(){
   const rows=(AD.spr||[]).map(x=>`<div class="prr" data-id="${esc(x.id)}"><div class="n"><b>${esc(ADPL[x.id]||x.id)}</b><small>${x.stars===x.def?'стандартная цена':'стандарт ⭐ '+x.def}</small></div><div class="f"><span>⭐</span><input inputmode="numeric" value="${x.stars}" data-def="${x.def}" data-was="${x.stars}" aria-label="Цена: ${esc(ADPL[x.id]||x.id)}"></div></div>`).join('');
   return `<div class="sec" style="margin-top:6px">Цены в магазине</div>
@@ -3508,6 +3706,7 @@ function paintProfile(){
   else{dl.textContent=wheelReady()?'колесо доступно':'завтра';dl.style.color=wheelReady()?'var(--ac)':'var(--mut)'}
 }
 $('#p-daily').onclick=()=>{hapI();openRewards()};
+$('#p-look').onclick=()=>{hapI();openLook()};
 $('#p-promo').onclick=()=>{hapI();openPromo()};
 /* ---------- номер на заказ за Telegram Stars ---------- */
 const CU={c:'KZ',d:'',l:'',reg:'',x:null,busy:false,tm:0};
