@@ -916,6 +916,8 @@ async function starsPreCheckout(env,q,now){
 const COS={
   tt_king:{t:'tt',n:'Король номеров',stars:100},tt_major:{t:'tt',n:'Мажор',stars:75},tt_hunter:{t:'tt',n:'Охотник за мификами',stars:150},tt_boss:{t:'tt',n:'Босс гаража',stars:120},
   bg_aurora:{t:'bg',n:'Северное сияние',stars:80},bg_sunset:{t:'bg',n:'Закат',stars:80},bg_carbon:{t:'bg',n:'Карбон',stars:60},bg_neon:{t:'bg',n:'Неон',stars:100},bg_gold:{t:'bg',n:'Золото',stars:120},bg_ice:{t:'bg',n:'Лёд',stars:80},
+  bg_forest:{t:'bg',n:'Лес',coins:15000},bg_ocean:{t:'bg',n:'Океан',coins:15000},
+  fx_mint:{t:'fx',n:'Мятный ник',coins:10000},fx_sky:{t:'fx',n:'Небесный ник',coins:10000},
   fx_gold:{t:'fx',n:'Золотой ник',stars:60},fx_neon:{t:'fx',n:'Неоновый ник',stars:70},fx_fire:{t:'fx',n:'Огненный ник',stars:80},fx_rainbow:{t:'fx',n:'Радужный ник',stars:100}
 };
 const ACH_E={first_spin:'🎰',spins_50:'🎲',spins_500:'🏆',countries:'🌍',garage_20:'🚗',garage_100:'🅿️',rare:'💎',epic:'🔮',legend:'👑',mythic:'🌟',elite:'🔢',sale_1:'🤝',sale_10:'💼',streak_7:'🔥',friends_3:'👥'};
@@ -943,7 +945,7 @@ const SHOP={
   sr1:{k:'sr',stars:75,n:1},sr5:{k:'sr',stars:340,n:5},
   bx:{k:'bx',stars:100,days:7},bl:{k:'bl',stars:80,add:5,cap:30},ba:{k:'ba',stars:60,add:2,cap:8},
   cs:{k:'cs',stars:600},
-  ...Object.fromEntries(Object.entries(COS).map(([k,v])=>[k,{k:'cos',stars:v.stars}]))
+  ...Object.fromEntries(Object.entries(COS).filter(([k,v])=>v.stars).map(([k,v])=>[k,{k:'cos',stars:v.stars}]))
 };
 /* слоты лотов и аукционов временно закрыты для игроков: код и лимиты остаются, товары не показываются и не продаются */
 const SLOTS_ON=false,SLOT_KEYS=['bl','ba'];
@@ -2066,9 +2068,23 @@ const routes={
     ]);
     const owned=new Set(own.results.map(x=>x.k));
     return{cur:lookOf(pr),
-      cos:Object.entries(COS).map(([k,c])=>({k,t:c.t,n:c.n,stars:SHOP[k].stars,own:owned.has(k)})),
+      cos:Object.entries(COS).map(([k,c])=>({k,t:c.t,n:c.n,cur:c.coins?'coins':'stars',stars:c.coins?0:SHOP[k].stars,coins:c.coins||0,own:owned.has(k)})),
       ach:ach.results.map(x=>achBy(x.k)).filter(Boolean).map(a=>({k:a.k,t:a.t,e:ACH_E[a.k]||'🏅'})),
       sts:STS.map(x=>({k:x[0],e:x[1],t:x[2]})),max:{sh:SH_MAX,bd:BD_MAX}};
+  },
+  /* косметика за монеты: списание и выдача одним пакетом, повторно не продаётся */
+  async 'POST /api/profile/buy'(env,u,url,now,b){
+    const k=String(b.k||''),c=COS[k];
+    if(!c||!c.coins)throw new HttpErr(400,'bad');
+    const res=await env.DB.batch([
+      env.DB.prepare('UPDATE users SET coins=coins-? WHERE id=? AND coins>=? AND NOT EXISTS(SELECT 1 FROM cos WHERE user=? AND k=?)').bind(c.coins,u.id,c.coins,u.id,k),
+      env.DB.prepare('INSERT OR IGNORE INTO cos(user,k,at) SELECT ?,?,? WHERE (SELECT changes())=1').bind(u.id,k,now)
+    ]);
+    if(res[0].meta.changes!==1){
+      const have=await env.DB.prepare('SELECT 1 x FROM cos WHERE user=? AND k=?').bind(u.id,k).first();
+      throw new HttpErr(have?409:402,have?'have':'coins');
+    }
+    return{coins:await coinsOf(env,u.id),k};
   },
   async 'POST /api/profile/look'(env,u,url,now,b){
     const[pr,own,ach]=await Promise.all([
