@@ -956,6 +956,7 @@ main{display:flex;flex-direction:column}
       <button class="btn pbtn" id="p-top"><span>Рейтинг игроков</span><span style="color:var(--mut);font-size:13px">Топ</span></button>
       <button class="btn pbtn" id="p-ref"><span>Пригласить друзей</span><span style="color:var(--ac);font-size:13px" id="p-ref-b">+15 000 за друга</span></button>
       <button class="btn pbtn" id="p-promo"><span>Промокод</span><span style="color:var(--mut);font-size:13px">Ввести</span></button>
+      <button class="btn pbtn" id="p-sup"><span>Поддержка</span><span style="color:var(--mut);font-size:13px">Написать</span></button>
       <button class="btn pbtn" id="p-admin" style="display:none"><span>Админ-панель</span><span style="color:var(--mut);font-size:13px">Открыть</span></button>
     </section>
 
@@ -3687,6 +3688,7 @@ async function openRef(){
 }
 $('#ov-rf').onclick=e=>{if(e.target.id==='ov-rf')hide('#ov-rf')};
 $('#p-ref').onclick=()=>{hapI();openRef()};
+$('#p-sup').onclick=()=>{hapI();openTg(`https://t.me/${BOT_USER}?start=support`)};
 
 let TOPT='wk';
 function openTop(){

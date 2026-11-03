@@ -2442,6 +2442,66 @@ async function tgCall(env,method,body){
   const r=await fetch(`${TG(env)}/bot${env.BOT_TOKEN}/${method}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
   return r.json().catch(()=>({}));
 }
+/* ===== поддержка через бота: игрок выбирает тему и пишет одним сообщением, админу приходит карточка; ответ админа (reply) уходит игроку ===== */
+const SUP_CATS={pay:'💳 Оплата и Stars',bug:'🐞 Ошибка в игре',ref:'🔗 Рефералы',idea:'💡 Идея',other:'✍️ Другое'};
+const SUP_MENU=()=>({inline_keyboard:[[{text:SUP_CATS.pay,callback_data:'sup:pay'},{text:SUP_CATS.bug,callback_data:'sup:bug'}],[{text:SUP_CATS.ref,callback_data:'sup:ref'},{text:SUP_CATS.idea,callback_data:'sup:idea'}],[{text:SUP_CATS.other,callback_data:'sup:other'}]]});
+const SUP_TXT='🛟 <b>Поддержка</b>\n\nВыберите тему, затем опишите вопрос одним сообщением. Можно приложить скриншот. Ответ придёт сюда, в чат с ботом.';
+const supAdmins=env=>[...new Set(String(env.ADMIN_IDS||ADMIN_DEFAULT).split(',').map(x=>+x.trim()).filter(x=>x>0))];
+const SUP_WIN=30*60e3,SUP_MAX=5;
+async function supState(env,uid){
+  const r=await env.DB.prepare('SELECT v FROM meta WHERE k=?').bind('sup:'+uid).first();
+  try{return r?JSON.parse(r.v)||{}:{}}catch(e){return{}}
+}
+const supSave=(env,uid,s)=>env.DB.prepare('INSERT INTO meta(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind('sup:'+uid,JSON.stringify(s)).run();
+const supOpen=(env,chat)=>tgCall(env,'sendMessage',{chat_id:chat,text:SUP_TXT,parse_mode:'HTML',reply_markup:SUP_MENU()});
+async function supCallback(env,q){
+  const d=String(q.data||''),uid=q.from&&q.from.id,chat=q.message&&q.message.chat&&q.message.chat.id;
+  if(!uid||!chat||q.message.chat.type!=='private'){await tgCall(env,'answerCallbackQuery',{callback_query_id:q.id});return}
+  if(d==='sup'){await tgCall(env,'answerCallbackQuery',{callback_query_id:q.id});await supOpen(env,chat);return}
+  const m=/^sup:(pay|bug|ref|idea|other)$/.exec(d);
+  if(!m){await tgCall(env,'answerCallbackQuery',{callback_query_id:q.id});return}
+  const st=await supState(env,uid);
+  await supSave(env,uid,{c:m[1],t:Date.now(),n:st.n||0,w:st.w||0});
+  await tgCall(env,'answerCallbackQuery',{callback_query_id:q.id});
+  await tgCall(env,'sendMessage',{chat_id:chat,text:`${SUP_CATS[m[1]]}\n\nНапишите сообщение (можно со скриншотом). Отмена — /cancel.`});
+}
+async function supSend(env,m,st,now){
+  const uid=m.from.id,chat=m.chat.id;
+  let n=st.n||0,w=st.w||0;if(now-w>36e5){n=0;w=now}
+  if(n>=SUP_MAX){await tgCall(env,'sendMessage',{chat_id:chat,text:'Слишком много обращений за час. Подождите или напишите '+SUPPORT_HANDLE+'.'});return}
+  const txt=String(m.text||m.caption||'').slice(0,3500),media=!m.text;
+  const name=[m.from.first_name,m.from.last_name].filter(Boolean).join(' ')||'Игрок';
+  const u=await env.DB.prepare('SELECT coins FROM users WHERE id=?').bind(uid).first();
+  const head=`🛟 <b>${SUP_CATS[st.c]||'Поддержка'}</b>\n👤 <a href="tg://user?id=${uid}">${esc(name)}</a>${m.from.username?' · @'+esc(m.from.username):''}\n🆔 ID: <code>${uid}</code>${u?'\n🪙 Монет: '+u.coins:''}`;
+  const hint='\n\n<i>Ответьте (reply) на это сообщение, и ответ уйдёт игроку.</i>';
+  let ok=0;
+  for(const a of supAdmins(env)){
+    try{
+      const r=await tgCall(env,'sendMessage',{chat_id:a,text:head+(txt?'\n\n'+esc(txt):'')+hint,parse_mode:'HTML',disable_web_page_preview:true});
+      if(!(r&&r.ok))continue;ok++;
+      if(media){
+        const c=await tgCall(env,'copyMessage',{chat_id:a,from_chat_id:chat,message_id:m.message_id,reply_to_message_id:r.result&&r.result.message_id});
+        if(c&&c.ok&&c.result)await env.DB.prepare('INSERT INTO meta(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind('sm:'+a+':'+c.result.message_id,String(uid)).run();
+      }
+    }catch(e){console.log('sup',e&&e.message)}
+  }
+  if(!ok){await tgCall(env,'sendMessage',{chat_id:chat,text:'Не удалось отправить сообщение. Напишите напрямую: '+SUPPORT_HANDLE});return}
+  await supSave(env,uid,{c:'',t:0,n:n+1,w});
+  await tgCall(env,'sendMessage',{chat_id:chat,text:'✅ Сообщение отправлено. Ответ придёт сюда, в чат с ботом.',reply_markup:PLAY_KB()});
+}
+/* ответ админа на карточку игрока (reply): уходит игроку от имени бота */
+async function supReply(env,m){
+  const rt=m.reply_to_message;if(!rt)return false;
+  let uid=0;const mm=/ID:\s*(\d{5,15})/.exec(String(rt.text||''));
+  if(mm&&rt.from&&rt.from.is_bot)uid=+mm[1];
+  if(!uid){const r=await env.DB.prepare('SELECT v FROM meta WHERE k=?').bind('sm:'+m.chat.id+':'+rt.message_id).first();if(r)uid=+r.v||0}
+  if(!uid)return false;
+  let r;
+  if(m.text){r=await tgCall(env,'sendMessage',{chat_id:uid,text:'💬 <b>Ответ поддержки</b>\n\n'+esc(m.text.slice(0,3500)),parse_mode:'HTML',reply_markup:PLAY_KB()})}
+  else{await tgCall(env,'sendMessage',{chat_id:uid,text:'💬 <b>Ответ поддержки</b>',parse_mode:'HTML'});r=await tgCall(env,'copyMessage',{chat_id:uid,from_chat_id:m.chat.id,message_id:m.message_id})}
+  await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:r&&r.ok?`✅ Отправлено игроку ${uid}`:`⚠️ Не доставлено игроку ${uid} (возможно, он заблокировал бота)`});
+  return true;
+}
 async function onHook(req,env){
   if(!env.BOT_TOKEN)return new Response('no',{status:500});
   const sec=req.headers.get('x-telegram-bot-api-secret-token')||'',want=await hookSecret(env);
@@ -2449,37 +2509,60 @@ async function onHook(req,env){
   if(d!==0)return new Response('forbidden',{status:403});
   let up={};try{up=await req.json()}catch(e){}
   if(up&&up.pre_checkout_query){await starsPreCheckout(env,up.pre_checkout_query,Date.now());return new Response('ok')}
+  if(up&&up.callback_query){try{await supCallback(env,up.callback_query)}catch(e){console.log('supcb',e&&e.message)}return new Response('ok')}
   const m=up&&up.message;
   if(m&&m.successful_payment&&m.from){try{await starsFulfil(env,m.from.id,m.successful_payment,Date.now())}catch(e){console.log('fulfil',e&&e.stack||e)}return new Response('ok')}
   if(m&&m.chat&&m.chat.type==='private'&&m.from&&!m.from.is_bot){
     const cm=/^\/(terms|paysupport|support)(@\w+)?\s*$/i.exec(String(m.text||''));
-    if(cm){try{await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:cm[1].toLowerCase()==='terms'?TERMS():PAYSUPPORT(),parse_mode:'HTML',disable_web_page_preview:true})}catch(e){console.log('TG',e&&e.message)}return new Response('ok')}
+    if(cm){try{
+      const k=cm[1].toLowerCase();
+      if(k==='support')await supOpen(env,m.chat.id);
+      else await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:k==='terms'?TERMS():PAYSUPPORT(),parse_mode:'HTML',disable_web_page_preview:true,reply_markup:k==='terms'?undefined:{inline_keyboard:[[{text:'🛟 Написать в поддержку',callback_data:'sup'}]]}});
+    }catch(e){console.log('TG',e&&e.message)}return new Response('ok')}
+    if(/^\/cancel(@\w+)?\s*$/i.test(String(m.text||''))){try{const st=await supState(env,m.from.id);if(st.c){await supSave(env,m.from.id,{c:'',t:0,n:st.n||0,w:st.w||0});await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:'Отменено.'})}}catch(e){console.log('cancel',e&&e.message)}return new Response('ok')}
+    if(/^\/start\s+support\b/i.test(String(m.text||''))){try{await supOpen(env,m.chat.id)}catch(e){console.log('TG',e&&e.message)}return new Response('ok')}
+    if(!/^\//.test(String(m.text||''))){
+      try{
+        if(isAdmin(env,m.from.id)&&m.reply_to_message&&await supReply(env,m))return new Response('ok');
+        const st=await supState(env,m.from.id),now=Date.now();
+        if(st.c&&now-st.t<SUP_WIN){await supSend(env,m,st,now);return new Response('ok')}
+      }catch(e){console.log('sup',e&&e.stack||e)}
+    }
   }
   if(m&&m.chat&&m.chat.type==='private'&&!(m.from&&m.from.is_bot)){
     const mm=/^\/start\s+ref_(\d{1,15})\b/.exec(String(m.text||''));
     if(mm){try{await regRef(env,m.from.id,+mm[1],Date.now())}catch(e){console.log('ref',e&&e.message)}}
     const pm=/^\/start\s+p_([a-z0-9]{3,16})\b/i.exec(String(m.text||''));
     if(pm){try{await regPartner(env,m.from.id,pm[1].toLowerCase(),Date.now())}catch(e){console.log('partner',e&&e.message)}}
-    try{await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:WELCOME(),parse_mode:'HTML',disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:'🎮 Играть',web_app:{url:WEBAPP}}],[{text:'📣 Канал',url:CHANNEL_URL}]]}})}catch(e){console.log('TG',e&&e.message)}
+    try{await tgCall(env,'sendMessage',{chat_id:m.chat.id,text:WELCOME(),parse_mode:'HTML',disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:'🎮 Играть',web_app:{url:WEBAPP}}],[{text:'📣 Канал',url:CHANNEL_URL},{text:'🛟 Поддержка',callback_data:'sup'}]]}})}catch(e){console.log('TG',e&&e.message)}
   }
   return new Response('ok');
 }
 let whAt=0;
+const SELF_ORIGIN='https://numerki.standoffboost80.workers.dev';
+const BOT_CMDS=[{command:'start',description:'Открыть игру'},{command:'support',description:'Связаться с поддержкой'},{command:'paysupport',description:'Проблема с оплатой'},{command:'terms',description:'Условия покупок'}];
+/* вебхук сверяется с реальным состоянием в Telegram (getWebhookInfo) и чинится сам; раз в ~5 минут (запросы и крон) */
 async function ensureWebhook(env,origin){
-  if(!env.BOT_TOKEN||Date.now()-whAt<6e5)return;whAt=Date.now();
+  if(!env.BOT_TOKEN||Date.now()-whAt<25e4)return;whAt=Date.now();
   try{
     await init(env);
-    const want=origin+'/tg/hook|v2|'+await hookSecret(env);
+    const url=origin+'/tg/hook',sec=await hookSecret(env),want=url+'|v3|'+sec;
     const cur=await env.DB.prepare("SELECT v FROM meta WHERE k='wh'").first();
-    if(cur&&cur.v===want)return;
-    const r=await tgCall(env,'setWebhook',{url:origin+'/tg/hook',secret_token:await hookSecret(env),allowed_updates:['message','pre_checkout_query'],max_connections:20});
-    if(r&&r.ok)await env.DB.prepare("INSERT INTO meta(k,v) VALUES('wh',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(want).run();
-    else console.log('setWebhook failed',JSON.stringify(r));
+    const info=await tgCall(env,'getWebhookInfo',{}),w=info&&info.result;
+    if(w&&w.last_error_message&&w.last_error_date&&Date.now()/1e3-w.last_error_date<900)console.log('webhook error',w.last_error_message);
+    const live=!!(w&&w.url===url&&Array.isArray(w.allowed_updates)&&w.allowed_updates.includes('callback_query'));
+    if(live&&cur&&cur.v===want)return;
+    const r=await tgCall(env,'setWebhook',{url,secret_token:sec,allowed_updates:['message','pre_checkout_query','callback_query'],max_connections:20});
+    if(r&&r.ok){
+      await env.DB.prepare("INSERT INTO meta(k,v) VALUES('wh',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(want).run();
+      await tgCall(env,'setMyCommands',{commands:BOT_CMDS}).catch(()=>{});
+      console.log('webhook set');
+    }else console.log('setWebhook failed',JSON.stringify(r));
   }catch(e){console.log('wh',e&&e.message)}
 }
 
 export default{
-  async scheduled(ev,env,ctx){curCtx=ctx;remAt=0;await init(env);await loadCfg(env,Date.now(),true);await settleAuctions(env,Date.now());await settleLotto(env,Date.now()).catch(e=>console.log('lotto',e&&e.message));await maybeReminders(env)},
+  async scheduled(ev,env,ctx){curCtx=ctx;remAt=0;await init(env);await loadCfg(env,Date.now(),true);await settleAuctions(env,Date.now());await settleLotto(env,Date.now()).catch(e=>console.log('lotto',e&&e.message));await maybeReminders(env);await ensureWebhook(env,SELF_ORIGIN)},
   async fetch(req,env,ctx){
     const h=cors(req,env);
     if(req.method==='OPTIONS')return new Response(null,{status:204,headers:h});
